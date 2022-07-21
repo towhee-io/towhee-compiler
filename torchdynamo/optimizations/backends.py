@@ -114,20 +114,15 @@ def nebullvm(subgraph):
 
     model = subgraph.model
     inputs = subgraph.example_inputs
-    bs = inputs[0].shape[0]
-    input_sizes = [inputs[0].shape[1:]]
 
     from towhee.functional import param_scope
-
-    with param_scope() as ps:
-        perf_loss_ths = ps().towhee.compiler.perf_loss_ths(None)
-    return optimize_torch_model(
-        model=model,
-        save_dir=".",
-        batch_size=bs,
-        input_sizes=input_sizes,
-        perf_loss_ths=perf_loss_ths,
-    )
+    with param_scope() as ps:    
+        return optimize_torch_model(
+            model=model,
+            save_dir=".",
+            dataloader=[[inputs, None]],
+            perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
+        )
 
 
 @create_backend
