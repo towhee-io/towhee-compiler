@@ -153,7 +153,7 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--backend", type=str, default="nebullvm")
     parser.add_argument("-r", "--repeat", type=int, default=5)
     parser.add_argument("-R", "--round", type=int, default=5)
-
+    parser.add_argument("-Q", "perf_loss_ths", type=float, default=None)
     args = parser.parse_args()
 
     original_dir = os.path.abspath(os.getcwd())
@@ -182,9 +182,6 @@ if __name__ == "__main__":
         print(f"trying model: {model_name}")
         args.model_name = model_name
 
-        optimize_ctx = jit_compile(backend=args.backend, perf_loss_ths=0.001)
+        optimize_ctx = jit_compile(backend=args.backend, perf_loss_ths=args.perf_loss_ths)
         name, model, example_input = load_model(args)
-        print(name, model, example_input)
-        # import ipdb
-        # ipdb.set_trace()
         print(run_one_model(args, model, example_input, optimize_ctx))
