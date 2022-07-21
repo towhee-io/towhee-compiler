@@ -43,7 +43,7 @@ class _Tracker(dict):
     def add(self, strong_obj):
         idx = id(strong_obj)
         if id(strong_obj) not in self:
-            self[idx] = weakref.ref(strong_obj, lambda _: self.remove(idx))
+            self[idx] = weakref.ref(strong_obj, lambda _: self.pop(idx))
 
     def __contains__(self, item):
         return dict.__contains__(self, id(item))
