@@ -19,7 +19,7 @@ from torchdynamo.testing import same
 
 # We are primarily interested in tf32 datatype
 torch.backends.cuda.matmul.allow_tf32 = True
-
+torchdynamo.config.raise_on_backend_error = False
 
 class Stats:
     totals = collections.defaultdict(collections.Counter)
@@ -138,9 +138,15 @@ def run_one_model(
             with torchdynamo.run():
                 t = timed(model, inputs, args.repeat)
             report.append(
+
                 dict(name=args.model_name, device=args.device, experiment="jit", time=t)
             )
+
         return pd.DataFrame(report)
+
+BLACKLIST = [
+    "attention_is_all_you_need_pytorch",
+]
 
 
 if __name__ == "__main__":
@@ -153,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--backend", type=str, default="nebullvm")
     parser.add_argument("-r", "--repeat", type=int, default=5)
     parser.add_argument("-R", "--round", type=int, default=5)
-    parser.add_argument("-Q", "perf_loss_ths", type=float, default=None)
+    parser.add_argument("-Q", "--perf_loss_ths", type=float, default=None)
     args = parser.parse_args()
 
     original_dir = os.path.abspath(os.getcwd())
@@ -179,6 +185,8 @@ if __name__ == "__main__":
     model_list = copy.deepcopy(args.model_name)
     print(f"trying model list: {model_list}")
     for model_name in model_list:
+        if model_name in BLACKLIST:
+            continue
         print(f"trying model: {model_name}")
         args.model_name = model_name
 
