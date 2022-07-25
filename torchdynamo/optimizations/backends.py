@@ -7,12 +7,14 @@ import subprocess
 import tempfile
 import warnings
 
+from pathlib import Path
 import numpy as np
 import torch
 
 import torchdynamo.convert_frame
 from torchdynamo.optimizations.subgraph import SubGraph
 from torchdynamo.utils import identity
+from torchdynamo.config import nebullvm_dir
 
 log = logging.getLogger(__name__)
 BACKENDS = dict()
@@ -111,18 +113,24 @@ def ofi(subgraph):
 @create_backend
 def nebullvm(subgraph):
     from nebullvm import optimize_torch_model
+    from nebullvm.inference_learners.base import LearnerMetadata
 
     model = subgraph.model
     inputs = subgraph.example_inputs
+    save_dir = Path(nebullvm_dir)
 
     from towhee.functional import param_scope
-    with param_scope() as ps:    
-        return optimize_torch_model(
-            model=model,
-            save_dir=".",
-            dataloader=[[inputs, None]],
-            perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-        )
+    with param_scope() as ps:
+        if save_dir.exists():
+            return LearnerMetadata.read(nebullvm_dir).load_model(nebullvm_dir)
+        else:
+            save_dir.mkdir()
+            return optimize_torch_model(
+                model=model,
+                save_dir=nebullvm_dir,
+                dataloader=[[inputs, None]],
+                perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
+            )
 
 
 @create_backend
