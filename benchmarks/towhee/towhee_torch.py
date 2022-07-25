@@ -153,7 +153,7 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--backend", type=str, default="nebullvm")
     parser.add_argument("-r", "--repeat", type=int, default=5)
     parser.add_argument("-R", "--round", type=int, default=5)
-    parser.add_argument("-Q", "perf_loss_ths", type=float, default=None)
+    parser.add_argument("-Q", "--perf_loss_ths", type=float, default=None)
     args = parser.parse_args()
 
     original_dir = os.path.abspath(os.getcwd())
