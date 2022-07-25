@@ -12,6 +12,9 @@ try:
 except ImportError:
     HAS_REFS_PRIMS = False
 
+# directory to save nebullvm model
+nebullvm_dir = 'nebullvm'
+
 # print out lots of stuff
 debug = False
 
