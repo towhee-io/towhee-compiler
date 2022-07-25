@@ -262,25 +262,26 @@ class InstructionTranslatorBase(object):
         except Exception:
             self.restore_graphstate(state)
             raise
-
-    def step(self):
-        """Process exactly one instruction, return False we should exit"""
-        inst = self.instructions[self.instruction_pointer]
-        self.current_instruction = inst
-        self.instruction_pointer += 1
-        if self.instruction_pointer < len(self.instructions):
-            self.next_instruction = self.instructions[self.instruction_pointer]
-        else:
-            self.instruction_pointer = None
-            self.next_instruction = None
-        if inst.starts_line:
-            self.lineno = inst.starts_line
-
+        
+    def simulator(self):
+        while True:
+            self.current_instruction = self.instructions[self.instruction_pointer]
+            self.instruction_pointer = self.instruction_pointer + 1
+            if self.instruction_pointer < len(self.instructions):
+                self.next_instruction = self.instructions[self.instruction_pointer]
+            else:
+                self.next_instruction = None
+                self.instruction_pointer = None
+            if self.current_instruction.starts_line:
+                self.lineno = self.current_instruction.starts_line
+            yield self.current_instruction
+            
+    def emit(self, inst):
         if len(self.stack) == 0 and self.should_compile_partial_graph():
             self.checkpoint = inst, self.copy_graphstate()
 
-        if config.trace:
-            print("TRACE", inst.opname, inst.argval, self.stack)
+        if not hasattr(self, inst.opname):
+            unimplemented(f"missing: {inst.opname}")
 
         try:
             if not hasattr(self, inst.opname):
@@ -301,15 +302,14 @@ class InstructionTranslatorBase(object):
             [create_instruction("JUMP_ABSOLUTE", target=continue_inst)]
             + self.instructions
         )
-
+        
     def run(self):
         try:
-            while (
-                self.instruction_pointer is not None
-                and not self.output.should_exit
-                and self.step()
-            ):
-                pass
+            for inst in self.simulator():
+                if self.output.should_exit:
+                    break
+                if not self.emit(inst):
+                    break
         except (
             exc.BackendCompilerFailed,
             exc.RestartAnalysis,

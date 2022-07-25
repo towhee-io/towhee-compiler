@@ -9,7 +9,6 @@ import itertools
 import logging.config
 import math
 import operator
-import os
 import re
 import sys
 import time
@@ -31,9 +30,6 @@ from . import config
 
 log = logging.getLogger(__name__)
 counters = collections.defaultdict(collections.Counter)
-troubleshooting_url = (
-    "https://github.com/pytorch/torchdynamo/blob/main/TROUBLESHOOTING.md"
-)
 
 
 LOGGING_CONFIG = {
@@ -51,11 +47,6 @@ LOGGING_CONFIG = {
     },
     "loggers": {
         "torchdynamo": {
-            "level": "DEBUG",
-            "handlers": ["torchdynamo_console"],
-            "propagate": False,
-        },
-        "torchinductor": {
             "level": "DEBUG",
             "handlers": ["torchdynamo_console"],
             "propagate": False,
