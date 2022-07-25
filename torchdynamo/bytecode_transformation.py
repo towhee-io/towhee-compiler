@@ -29,18 +29,18 @@ class Instruction:
 
     def __eq__(self, other):
         return id(self) == id(other)
-
-
-def convert_instruction(i: dis.Instruction):
-    return Instruction(
-        i.opcode,
-        i.opname,
-        i.arg,
-        i.argval,
-        i.offset,
-        i.starts_line,
-        i.is_jump_target,
-    )
+    
+    @staticmethod
+    def from_dis(i: dis.Instruction):
+        return Instruction(
+            i.opcode,
+            i.opname,
+            i.arg,
+            i.argval,
+            i.offset,
+            i.starts_line,
+            i.is_jump_target,
+        )
 
 
 class _NotProvided:
@@ -362,7 +362,7 @@ def transform_code_object(code, transformations, safe=False):
 
 
 def cleaned_instructions(code, safe=False):
-    instructions = list(map(convert_instruction, dis.get_instructions(code)))
+    instructions = list(map(Instruction.from_dis, dis.get_instructions(code)))
     check_offsets(instructions)
     virtualize_jumps(instructions)
     strip_extended_args(instructions)
