@@ -143,10 +143,7 @@ class OutputGraph(fx.Tracer):
                     name = f"{name}_{i}"
                     break
 
-        if placeholders:
-            ctx = self.graph.inserting_after(placeholders[-1])
-        else:
-            ctx = self.graph.inserting_before(None)
+        ctx = self.graph.inserting_after(placeholders[-1]) if placeholders else self.graph.inserting_before(None)
         with ctx:
             return self.create_proxy("placeholder", name, (), {}, type_expr=type_expr)
 

@@ -36,7 +36,6 @@ from .utils import guard_failures
 from .utils import is_namedtuple
 from .utils import istype
 from .utils import orig_code_map
-from .utils import troubleshooting_url
 
 
 class _Tracker(dict):
@@ -238,7 +237,6 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
                 f"torchdynamo hit config.cache_size_limit ({config.cache_size_limit})\n"
                 f"   function: {format_func_info(code)}\n"
                 f"   reasons:  {format_guard_failures(code)}\n"
-                f"to diagnose recompilation issues, see {troubleshooting_url}.",
             )
             unimplemented("cache_size_limit reached")
         output = None
