@@ -28,12 +28,7 @@ class UserDefinedVariable(VariableTracker):
 
 
 class UserDefinedClassVariable(UserDefinedVariable):
-    def __init__(self, value, **kwargs):
-        super().__init__(**kwargs)
-        self.value = value
-
-    def as_python_constant(self):
-        return self.value
+    _as_python_constant_ = "self"
 
     def var_getattr(self, tx, name: str) -> "VariableTracker":
         options = VariableTracker.propagate(self)
@@ -118,21 +113,19 @@ class UserDefinedObjectVariable(UserDefinedVariable):
     """
     Mostly objects of defined type.  Catch-all for something where we only know the type.
     """
+    _python_type_ = "self"
 
     def __init__(self, value, value_type=None, **kwargs):
         super(UserDefinedObjectVariable, self).__init__(**kwargs)
         self.value = value
-        self.value_type = value_type or type(value)
-        assert type(value) is self.value_type
+        if value_type:
+            assert type(value) is value_type
 
     def __str__(self):
-        inner = self.value_type.__name__
+        inner = self.python_type().__name__
         if inner == "builtin_function_or_method":
             inner = str(getattr(self.value, "__name__", None))
         return f"{self.__class__.__name__}({inner})"
-
-    def python_type(self):
-        return self.value_type
 
     @staticmethod
     @functools.lru_cache(None)

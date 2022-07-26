@@ -323,7 +323,7 @@ class InstructionTranslatorBase(object):
                 sys.stderr.write(
                     f"ERROR FROM offset={self.current_instruction.offset} "
                     f"filename {self.code_options.get('co_filename')} "
-                    f"{self.lineno} {typestr(e)}\n"
+                    f"{self.lineno} {typestr(e)}: {e}\n"
                 )
             raise
         finally:

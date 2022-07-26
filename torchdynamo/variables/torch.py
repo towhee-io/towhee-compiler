@@ -23,6 +23,8 @@ from .tensor import TensorWithTFOverrideVariable
 
 class TorchVariable(VariableTracker):
     """Points to a module or method in torch.*"""
+    _as_python_constant_ = "self"
+    _as_proxy_ = "self"
 
     def __init__(self, value, **kwargs):
         super(TorchVariable, self).__init__(**kwargs)
@@ -62,16 +64,10 @@ class TorchVariable(VariableTracker):
     def reconstruct(self, codegen):
         return codegen.setup_globally_cached(self.unique_var_name(), self.value)
 
-    def as_proxy(self):
-        return self.value
-
     def python_type(self):
         if isinstance(self.value, (torch.Tensor, torch.nn.Module)):
             return type(self.value)
         return super().python_type()
-
-    def as_python_constant(self):
-        return self.value
 
     def can_constant_fold_through(self):
         if self.value in (

@@ -88,17 +88,14 @@ class BaseListVariable(VariableTracker):
 
 
 class RangeVariable(BaseListVariable):
+    _python_type_ = range
+    _as_python_constant_ = "self"
+
     def __init__(self, value, items=None, guards=None, **kwargs):
         if items is None:
             items = [variables.ConstantVariable(x, guards=guards) for x in value]
         super().__init__(items, guards=guards, **kwargs)
         self.value = value
-
-    def python_type(self):
-        return range
-
-    def as_python_constant(self):
-        return self.value
 
     def reconstruct(self, codegen):
         assert "range" not in codegen.tx.f_globals
@@ -126,8 +123,7 @@ class RangeVariable(BaseListVariable):
 
 
 class ListVariable(BaseListVariable):
-    def python_type(self):
-        return list
+    _python_type_ = list
 
     def reconstruct(self, codegen):
         codegen.foreach(self.items)
@@ -205,8 +201,7 @@ class ListVariable(BaseListVariable):
 
 
 class TupleVariable(BaseListVariable):
-    def python_type(self):
-        return tuple
+    _python_type_ = tuple
 
     def reconstruct(self, codegen):
         codegen.foreach(self.items)
@@ -241,9 +236,7 @@ class TupleVariable(BaseListVariable):
 
 class SizeVariable(TupleVariable):
     """torch.Size(...)"""
-
-    def python_type(self):
-        return torch.Size
+    _python_type_ = torch.Size
 
     def reconstruct(self, codegen):
         codegen.load_import_from("torch", "Size")
@@ -294,6 +287,8 @@ class NamedTupleVariable(TupleVariable):
 
 
 class SliceVariable(BaseListVariable):
+    _python_type_ = slice
+
     def __init__(self, items, **kwargs):
         start, stop, step = [variables.ConstantVariable(None)] * 3
         if len(items) == 1:
@@ -308,9 +303,6 @@ class SliceVariable(BaseListVariable):
 
     def as_proxy(self):
         return slice(*self._as_proxy())
-
-    def python_type(self):
-        return slice
 
     def as_python_constant(self):
         return slice(*[x.as_python_constant() for x in self.items])
