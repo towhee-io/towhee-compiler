@@ -122,15 +122,18 @@ def nebullvm(subgraph):
     from towhee.functional import param_scope
     with param_scope() as ps:
         if save_dir.exists():
-            return LearnerMetadata.read(nebullvm_dir).load_model(nebullvm_dir)
-        else:
+            try:
+                return LearnerMetadata.read(nebullvm_dir).load_model(nebullvm_dir)
+            except:
+                pass
+        if not save_dir.exists():
             save_dir.mkdir()
-            return optimize_torch_model(
-                model=model,
-                save_dir=nebullvm_dir,
-                dataloader=[[inputs, None]],
-                perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-            )
+        return optimize_torch_model(
+            model=model,
+            save_dir=nebullvm_dir,
+            dataloader=[[inputs, None]],
+            perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
+        )
 
 
 @create_backend

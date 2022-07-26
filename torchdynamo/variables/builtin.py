@@ -140,9 +140,6 @@ class BuiltinVariable(VariableTracker):
         super(BuiltinVariable, self).__init__(**kwargs)
         self.fn = fn
 
-    def __str__(self):
-        return f"{self.__class__.__name__}({self.fn.__name__})"
-
     def python_type(self):
         return type(self.fn)
 

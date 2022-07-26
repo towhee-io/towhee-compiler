@@ -11,7 +11,6 @@ from ..exc import unimplemented
 from ..source import AttrSource
 from ..source import Source
 from ..utils import dict_values
-from ..utils import identity
 from ..utils import istype
 from ..utils import odict_values
 
@@ -40,6 +39,11 @@ class VariableTracker:
 
     # fields to leave unmodified in apply()
     _nonvar_fields = ["value"]
+
+    # predefined flags
+    _python_type_ = None
+    _as_python_constant_ = None
+    _as_proxy_ = None
 
     @staticmethod
     def propagate(*vars: List[List["VariableTracker"]]):
@@ -75,7 +79,7 @@ class VariableTracker:
     @classmethod
     def copy(cls, value):
         """Deeper (but not full) copy, leaving FX and user objects alone"""
-        return cls.apply(identity, value)
+        return cls.apply(lambda x: x, value)
 
     @classmethod
     def apply(
@@ -131,16 +135,26 @@ class VariableTracker:
         return self.add_guards(options.get("guards", set()))
 
     def __str__(self):
-        return f"{self.__class__.__name__}()"
+        blacklist = ["guards", "source", "mutable_local"]
+        args = {k: v for k, v in self.__dict__.items() if k not in blacklist}
+        return f"{self.__class__.__name__}({args})"
 
     def __repr__(self):
         return str(self)
 
     def python_type(self):
+        if type(self._python_type_) is type:
+            return self._python_type_
+        if isinstance(self._python_type_, str):
+            if self._python_type_ == "self":
+                return type(self.value)
         raise NotImplementedError(f"{self} has no type")
 
     def as_python_constant(self):
         """For constants"""
+        if isinstance(self._as_python_constant_, str):
+            if self._as_python_constant_ == "self":
+                return self.value
         raise NotImplementedError(f"{self} is not a constant")
 
     def is_python_constant(self):
@@ -190,6 +204,9 @@ class VariableTracker:
             return False
 
     def as_proxy(self):
+        if isinstance(self._as_proxy_, str):
+            if self._as_proxy_ == "self":
+                return self.value
         raise NotImplementedError(str(self))
 
     def reconstruct(self, codegen):
@@ -214,7 +231,7 @@ class VariableTracker:
     def call_function(
         self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
     ) -> "VariableTracker":
-        unimplemented(f"call_function {self} {args} {kwargs}")
+        unimplemented(f"call_function {type(self)}: {self} {args} {kwargs}")
 
     def call_method(
         self,
@@ -237,10 +254,11 @@ class VariableTracker:
             return self.var_getattr(tx, args[0].as_python_constant()).add_options(
                 self, args[0]
             )
-        raise unimplemented(f"call_method {self} {name} {args} {kwargs}")
+        raise unimplemented(f"call_method {type(self)}: {self} {name} {args} {kwargs}")
 
     def __init__(
         self,
+        value: Any = None,
         guards: Optional[Set] = None,
         source: Source = None,
         mutable_local: MutableLocal = None,
@@ -249,6 +267,7 @@ class VariableTracker:
         self.guards = guards or set()
         self.source = source
         self.mutable_local = mutable_local
+        self.value = value
 
 
 def typestr(*objs):
