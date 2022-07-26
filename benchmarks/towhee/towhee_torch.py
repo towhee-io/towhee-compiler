@@ -101,7 +101,7 @@ def run_one_model(
             print("ERROR")
             return sys.exit(-1)
         if not same(correct_result, new_result, False, tolerance):
-            print("INCORRECT")
+            print("INCORRECT when compre results.")
         ok, total = Stats.reset_counters()
         results = []
 

@@ -232,9 +232,6 @@ class DataClassVariable(ConstDictVariable):
         super(DataClassVariable, self).__init__(items, user_cls, **options)
         assert self.is_matching_cls(user_cls)
 
-    def as_proxy(self):
-        raise NotImplementedError()
-
     def reconstruct(self, codegen):
         codegen.extend_output([codegen._create_load_const(self.user_cls)])
         result = list(super().reconstruct(codegen))

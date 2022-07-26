@@ -9,22 +9,9 @@ from .base import typestr
 
 
 class ConstantVariable(VariableTracker):
-    def __init__(self, value, **kwargs):
-        super(ConstantVariable, self).__init__(**kwargs)
-        self.value = value
-
-    def as_proxy(self):
-        return self.value
-
-    def __str__(self):
-        # return f"ConstantVariable({self.value})"
-        return f"ConstantVariable({type(self.value).__name__})"
-
-    def python_type(self):
-        return type(self.value)
-
-    def as_python_constant(self):
-        return self.value
+    _python_type_ = "self"
+    _as_python_constant_ = "self"
+    _as_proxy_ = "self"
 
     @property
     def items(self):
@@ -98,18 +85,6 @@ class ConstantVariable(VariableTracker):
 
 
 class EnumVariable(VariableTracker):
-    def __init__(self, value, **kwargs):
-        super(EnumVariable, self).__init__(**kwargs)
-        self.value = value
-
-    def as_proxy(self):
-        return self.value
-
-    def __str__(self):
-        return f"EnumVariable({type(self.value)})"
-
-    def python_type(self):
-        return type(self.value)
-
-    def as_python_constant(self):
-        return self.value
+    _python_type_ = "self"
+    _as_python_constant_ = "self"
+    _as_proxy_ = "self"
