@@ -32,27 +32,25 @@ log = logging.getLogger(__name__)
 counters = collections.defaultdict(collections.Counter)
 
 
-LOGGING_CONFIG = {
-    "version": 1,
-    "formatters": {
-        "torchdynamo_format": {"format": "%(levelname)s %(name)s: %(message)s"},
+LOGGING_CONFIG = dict(
+    version=1,
+    formatters={
+        "info": {
+            "format": "%(asctime)s|%(levelname)s|%(module)s:%(lineno)s| %(message)s"
+        },
     },
-    "handlers": {
-        "torchdynamo_console": {
+    loggers={
+        "": dict(level="NOTSET", handlers=["console"]),
+    },
+    handlers={
+        "console": {
+            "level": "INFO",
+            "formatter": "info",
             "class": "logging.StreamHandler",
-            "level": "DEBUG",
-            "formatter": "torchdynamo_format",
             "stream": "ext://sys.stdout",
         },
     },
-    "loggers": {
-        "torchdynamo": {
-            "level": "DEBUG",
-            "handlers": ["torchdynamo_console"],
-            "propagate": False,
-        },
-    },
-}
+)
 
 
 def count_calls(g: fx.Graph):
