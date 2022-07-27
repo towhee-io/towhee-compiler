@@ -34,6 +34,8 @@ class BaseListVariable(VariableTracker):
         return [x.as_proxy() for x in self.items]
 
     def as_python_constant(self):
+        if isinstance(self._as_python_constant_, str) and self._as_python_constant_ == "self":
+            return super().as_python_constant()
         return self.python_type()([x.as_python_constant() for x in self.items])
 
     def as_proxy(self):
