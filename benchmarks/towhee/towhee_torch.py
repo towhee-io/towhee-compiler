@@ -150,6 +150,8 @@ def run_one_model(
 
 BLACKLIST = [
     "attention_is_all_you_need_pytorch",
+    "detectron2_maskrcnn",
+    "fambench_xlmr"
 ]
 
 
@@ -161,8 +163,8 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model_name", type=str)
     parser.add_argument("-d", "--device", type=str, default="cpu")
     parser.add_argument("-b", "--backend", type=str, default="nebullvm")
-    parser.add_argument("-r", "--repeat", type=int, default=5)
-    parser.add_argument("-R", "--round", type=int, default=5)
+    parser.add_argument("-r", "--repeat", type=int, default=1)
+    parser.add_argument("-R", "--round", type=int, default=1)
     parser.add_argument("-Q", "--perf_loss_ths", type=float, default=None)
     args = parser.parse_args()
 

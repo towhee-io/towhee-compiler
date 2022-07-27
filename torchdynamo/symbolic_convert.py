@@ -5,7 +5,6 @@ import functools
 import importlib
 import inspect
 import itertools
-import logging
 import operator
 import sys
 import traceback
@@ -73,8 +72,6 @@ from .variables.nn_module import NNModuleVariable
 from .variables.tensor import TensorVariable
 from .variables.torch import TorchVariable
 from .variables.user_defined import UserDefinedVariable
-
-log = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -265,6 +262,8 @@ class InstructionTranslatorBase(object):
         
     def simulator(self):
         while True:
+            if self.instruction_pointer is None:
+                break
             self.current_instruction = self.instructions[self.instruction_pointer]
             self.instruction_pointer = self.instruction_pointer + 1
             if self.instruction_pointer < len(self.instructions):
@@ -325,6 +324,8 @@ class InstructionTranslatorBase(object):
                     f"filename {self.code_options.get('co_filename')} "
                     f"{self.lineno} {typestr(e)}: {e}\n"
                 )
+                import traceback
+                traceback.print_exc()
             raise
         finally:
             # Cleanup the outputGraph to delete the held tensors. We perform the
