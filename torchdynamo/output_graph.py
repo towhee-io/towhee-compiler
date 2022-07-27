@@ -17,8 +17,8 @@ import torchdynamo
 
 from . import config
 from . import variables
-from .bytecode_transformation import Instruction
-from .bytecode_transformation import create_instruction
+from .ir import Instruction
+from .ir import create_instruction
 from .bytecode_transformation import unique_id
 from .codegen import PyCodegen
 from .exc import BackendCompilerFailed
