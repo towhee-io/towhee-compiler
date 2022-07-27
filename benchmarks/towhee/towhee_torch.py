@@ -17,9 +17,13 @@ from towhee.compiler import jit_compile
 import torchdynamo
 from torchdynamo.testing import same
 
+logging.config.dictConfig(torchdynamo.utils.LOGGING_CONFIG)
+logger = logging.getLogger(__name__)
+
 # We are primarily interested in tf32 datatype
 torch.backends.cuda.matmul.allow_tf32 = True
 torchdynamo.config.raise_on_backend_error = False
+
 
 class Stats:
     totals = collections.defaultdict(collections.Counter)
@@ -98,10 +102,10 @@ def run_one_model(
                 new_result = model(*example_inputs)
         except Exception:
             logging.exception("unhandled error")
-            print("ERROR")
+            logger.info("ERROR")
             return sys.exit(-1)
         if not same(correct_result, new_result, False, tolerance):
-            print("INCORRECT")
+            logger.info("INCORRECT when compre results.")
         ok, total = Stats.reset_counters()
         results = []
 
@@ -138,11 +142,11 @@ def run_one_model(
             with torchdynamo.run():
                 t = timed(model, inputs, args.repeat)
             report.append(
-
                 dict(name=args.model_name, device=args.device, experiment="jit", time=t)
             )
 
         return pd.DataFrame(report)
+
 
 BLACKLIST = [
     "attention_is_all_you_need_pytorch",
@@ -183,13 +187,15 @@ if __name__ == "__main__":
         ]
 
     model_list = copy.deepcopy(args.model_name)
-    print(f"trying model list: {model_list}")
+    logger.info(f"trying model list: {model_list}")
     for model_name in model_list:
         if model_name in BLACKLIST:
             continue
-        print(f"trying model: {model_name}")
+        logger.info(f"trying model: {model_name}")
         args.model_name = model_name
 
-        optimize_ctx = jit_compile(backend=args.backend, perf_loss_ths=args.perf_loss_ths)
+        optimize_ctx = jit_compile(
+            backend=args.backend, perf_loss_ths=args.perf_loss_ths
+        )
         name, model, example_input = load_model(args)
-        print(run_one_model(args, model, example_input, optimize_ctx))
+        logger.info(run_one_model(args, model, example_input, optimize_ctx))
