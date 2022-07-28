@@ -91,13 +91,11 @@ class ClosureVariable(UnknownVariable):
 
 
 class NewCellVariable(VariableTracker):
-    def __init__(self, **kwargs):
-        super(NewCellVariable, self).__init__(**kwargs)
+    pass
 
 
 class NewGlobalVariable(VariableTracker):
-    def __init__(self, **kwargs):
-        super(NewGlobalVariable, self).__init__(**kwargs)
+    pass
 
 
 class ContextManagerVariable(VariableTracker):
@@ -424,9 +422,6 @@ class GetAttrVariable(VariableTracker):
         self.obj = obj
         self.name = name
 
-    def __str__(self):
-        return f"{self.__class__.__name__}({self.obj}, {self.name})"
-
     def as_proxy(self):
         return getattr(self.obj.as_proxy(), self.name)
 
@@ -524,24 +519,12 @@ class GetAttrVariable(VariableTracker):
 
 
 class PythonModuleVariable(VariableTracker):
-    def __init__(self, value: types.ModuleType, **kwargs):
-        super(PythonModuleVariable, self).__init__(**kwargs)
-        self.value = value
-
-    def python_type(self):
-        return types.ModuleType
+    _python_type_ = types.ModuleType
 
 
 class SkipFilesVariable(VariableTracker):
-    def __init__(self, value, **kwargs):
-        super().__init__(**kwargs)
-        self.value = value
-
-    def python_type(self):
-        return type(self.value)
-
-    def as_python_constant(self):
-        return self.value
+    _python_type_ = "self"
+    _as_python_constant_ = "self"
 
     def call_function(
         self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
@@ -557,9 +540,6 @@ class SkipFilesVariable(VariableTracker):
 
 
 class TypingVariable(VariableTracker):
-    def __init__(self, value, **kwargs):
-        super().__init__(**kwargs)
-        self.value = value
 
     def call_method(
         self,
@@ -580,21 +560,4 @@ class NumpyVariable(VariableTracker):
     """
     Wrapper around `numpy.*` for better error messages.
     """
-
-    def __init__(self, value, **kwargs):
-        super().__init__(**kwargs)
-        self.value = value
-
-    def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
-        unimplemented("numpy")
-
-    def call_method(
-        self,
-        tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        unimplemented("numpy")
+    pass

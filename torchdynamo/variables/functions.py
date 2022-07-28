@@ -74,6 +74,8 @@ class BaseUserFunctionVariable(VariableTracker):
 
 class UserFunctionVariable(BaseUserFunctionVariable):
     """Some unsupported user-defined global function"""
+    
+    _python_type_ = types.FunctionType
 
     def __init__(self, fn, **kwargs):
         super(UserFunctionVariable, self).__init__(**kwargs)
@@ -92,9 +94,6 @@ class UserFunctionVariable(BaseUserFunctionVariable):
 
     def get_code(self):
         return self.fn.__code__
-
-    def python_type(self):
-        return types.FunctionType
 
     def has_self(self):
         return getattr(self.fn, "__self__", None) is not None
@@ -174,19 +173,15 @@ class UserFunctionVariable(BaseUserFunctionVariable):
 
 class UserMethodVariable(UserFunctionVariable):
     """Some unsupported user-defined method"""
+    
+    _python_type_ = types.MethodType
 
     def __init__(self, fn, obj, **kwargs):
         super(UserMethodVariable, self).__init__(fn=fn, **kwargs)
         self.obj = obj
 
-    def __str__(self):
-        return f"{self.__class__.__name__}({self.fn}, {self.obj})"
-
     def self_args(self):
         return [self.obj]
-
-    def python_type(self):
-        return types.MethodType
 
     def call_function(
         self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
