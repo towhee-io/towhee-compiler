@@ -9,11 +9,12 @@ import os
 
 import torch
 
-from torchdynamo import config
+from torchdynamo.config import base_dir
 from torchdynamo.utils import check_is_cuda
 from torchdynamo.utils import checkpoint_params
 from torchdynamo.utils import is_jit_model
 from torchdynamo.utils import torchscript
+from .hash_name import graph_hash
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def load_module_fx(name):
 
 
 def load_module_jit(name):
-    filename = os.path.join(config.base_dir, "subgraphs", name, "model.ts")
+    filename = os.path.join(base_dir, "subgraphs", name, "model.ts")
     if not os.path.exists(filename):
         return None
     model = torch.jit.load(filename)
@@ -57,7 +58,7 @@ def load_module_jit(name):
 class SubGraph(object):
     @classmethod
     def load(cls, name):
-        model_dir = os.path.join(config.base_dir, "subgraphs", name)
+        model_dir = os.path.join(base_dir, "subgraphs", name)
         example_inputs = torch.load(os.path.join(model_dir, "example_inputs.pt"))
         example_outputs = torch.load(os.path.join(model_dir, "example_outputs.pt"))
         metadata = json.loads(open(os.path.join(model_dir, "metadata.json")).read())
@@ -95,6 +96,7 @@ class SubGraph(object):
         self.model = model
         self.example_inputs = example_inputs
         self.model_dir = model_dir
+        self.hash_path = graph_hash(model, example_inputs)
 
     def filename(self, name):
         return os.path.join(self.model_dir, name)
