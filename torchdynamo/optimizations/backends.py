@@ -14,7 +14,7 @@ import torch
 import torchdynamo.convert_frame
 from torchdynamo.optimizations.subgraph import SubGraph
 from torchdynamo.utils import identity
-from torchdynamo.config import nebullvm_dir
+from torchdynamo.config import cached_dir, debug
 
 log = logging.getLogger(__name__)
 BACKENDS = dict()
@@ -117,23 +117,26 @@ def nebullvm(subgraph):
 
     model = subgraph.model
     inputs = subgraph.example_inputs
-    save_dir = Path(nebullvm_dir)
+    hash_path = subgraph.hash_path
+    cached_model_dir = Path(cached_dir) / hash_path
+    str_cached_model_dir = str(cached_model_dir)
 
     from towhee.functional import param_scope
     with param_scope() as ps:
-        if save_dir.exists():
-            try:
-                return LearnerMetadata.read(nebullvm_dir).load_model(nebullvm_dir)
-            except:
-                pass
-        if not save_dir.exists():
-            save_dir.mkdir()
-        return optimize_torch_model(
-            model=model,
-            save_dir=nebullvm_dir,
-            dataloader=[[inputs, None]],
-            perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-        )
+        if cached_model_dir.exists():
+            if debug:
+                print(f"Found the cached model in ", str_cached_model_dir)
+            return LearnerMetadata.load(str_cached_model_dir).load_model(str_cached_model_dir)
+        else:
+            if debug:
+                print(f"Saving the model to ", str_cached_model_dir)
+            cached_model_dir.mkdir(parents=True)
+            return optimize_torch_model(
+                model=model,
+                save_dir=str_cached_model_dir,
+                dataloader=[[inputs, None]],
+                perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
+            )
 
 
 @create_backend
