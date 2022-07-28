@@ -119,21 +119,21 @@ def nebullvm(subgraph):
     inputs = subgraph.example_inputs
     hash_path = subgraph.hash_path
     cached_model_dir = Path(cached_dir) / hash_path
-    save_dir = str(cached_model_dir)
+    str_cached_model_dir = str(cached_model_dir)
 
     from towhee.functional import param_scope
     with param_scope() as ps:
         if cached_model_dir.exists():
             if debug:
-                print(f"Found the cached model: ", save_dir)
-            return LearnerMetadata.load(save_dir).load_model(save_dir)
+                print(f"Found the cached model in ", str_cached_model_dir)
+            return LearnerMetadata.load(str_cached_model_dir).load_model(str_cached_model_dir)
         else:
             if debug:
-                print(f"Saving the model to ", save_dir)
+                print(f"Saving the model to ", str_cached_model_dir)
             cached_model_dir.mkdir(parents=True)
             return optimize_torch_model(
                 model=model,
-                save_dir=save_dir,
+                save_dir=str_cached_model_dir,
                 dataloader=[[inputs, None]],
                 perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
             )
