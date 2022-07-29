@@ -442,9 +442,10 @@ class GetAttrVariable(VariableTracker):
         codegen(self.obj)
         return codegen.create_load_attrs(self.name)
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
 
         # This variable is True when it corresponds to user code such as
         #
@@ -501,21 +502,21 @@ class GetAttrVariable(VariableTracker):
             return self.obj.call_apply(tx, args, kwargs).trace(self)
         return self.obj.call_method(tx, self.name, args, kwargs).trace(self)
 
+    @typechecked
     def call_method(
         self,
         tx,
         name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         if (
             name == "__len__"
             and isinstance(self.obj, InspectSignatureVariable)
             and self.name == "parameters"
         ):
-            return variables.ConstantVariable(
-                self.obj.inspected.num_parameters(),
-                **VariableTracker.propagate(self, self.obj, self.obj.inspected),
+            return variables.constant(self.obj.inspected.num_parameters()).trace(
+                self, self.obj, self.obj.inspected
             )
         return super(GetAttrVariable, self).call_method(tx, name, args, kwargs)
 
@@ -528,9 +529,10 @@ class SkipFilesVariable(VariableTracker):
     _python_type_ = "self"
     _as_python_constant_ = "self"
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         if inspect.getattr_static(self.value, "_torchdynamo_disable", False):
             unimplemented("call torchdynamo.disable() wrapped function")
         else:
@@ -542,18 +544,18 @@ class SkipFilesVariable(VariableTracker):
 
 
 class TypingVariable(VariableTracker):
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         if name == "__getitem__" and len(args) == 1:
-            return variables.ConstantVariable(
-                self.value[args[0].as_python_constant()],
-                **VariableTracker.propagate(self, args),
-            )
+            index = args[0].as_python_constant()
+            return variables.constant(self.value[index]).trace(self, args)
+
         unimplemented("typing")
 
 

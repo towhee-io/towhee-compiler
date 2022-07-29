@@ -85,7 +85,7 @@ class NNModuleVariable(VariableTracker):
     def var_getattr(self, tx, name):
         from .builder import VariableBuilder
 
-        options = VariableTracker.propagate(self)
+        options = variables.propagate(self)
         guards = options.get("guards", set())
 
         if self.source:
@@ -207,7 +207,6 @@ class NNModuleVariable(VariableTracker):
         args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> VariableTracker:
-        from . import ConstantVariable
         from . import ListIteratorVariable
         from . import TupleVariable
 
@@ -221,7 +220,7 @@ class NNModuleVariable(VariableTracker):
         if name == "_check_input_dim" and skipfiles.is_torch_inline_allowed(
             inspect.getfile(module.__class__._check_input_dim)
         ):
-            return ConstantVariable(True, **options)
+            return variables.constant(True, **options)
 
         if not all(
             x.is_python_constant() for x in itertools.chain(args, kwargs.values())
@@ -351,7 +350,7 @@ class NNModuleVariable(VariableTracker):
             assert type(module) is torch.nn.ModuleList
             assert self.source
 
-            return ConstantVariable(
+            return variables.constant(
                 module._get_abs_string_index(args[0].as_python_constant()), **options
             )
         else:

@@ -55,9 +55,9 @@ class BaseListVariable(VariableTracker):
                     mutable_local=None,
                 ).trace(arg, self)
             else:
-                return self.clone(
-                    items=self.items[index], mutable_local=None
-                ).trace(arg, self)
+                return self.clone(items=self.items[index], mutable_local=None).trace(
+                    arg, self
+                )
         else:
             assert isinstance(index, int)
             return self.items[index].trace(arg, self)
@@ -73,13 +73,12 @@ class BaseListVariable(VariableTracker):
         args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
         if name == "__getitem__":
             assert not kwargs and len(args) == 1
             return self.getitem_const(args[0])
         elif name == "__add__":
             assert not kwargs and len(args) == 1
-            return type(self)(self.items + args[0].items, **options)
+            return type(self)(self.items + args[0].items).trace(self, args, kwargs)
         elif (
             name == "__contains__"
             and len(args) == 1
@@ -89,7 +88,7 @@ class BaseListVariable(VariableTracker):
             assert not kwargs
             search = args[0].as_python_constant()
             result = any(x.as_python_constant() == search for x in self.items)
-            return variables.constant(result, **options)
+            return variables.constant(result).trace(self, args, kwargs)
 
         return super(BaseListVariable, self).call_method(tx, name, args, kwargs)
 
@@ -215,21 +214,21 @@ class TupleVariable(BaseListVariable):
         codegen.foreach(self.items)
         return [create_instruction("BUILD_TUPLE", len(self.items))]
 
+    @typechecked
     def call_method(
         self,
         tx,
         name: str,
-        args: List[VariableTracker],
+        args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
         if (
             name in ("__add__", "__iadd__")
             and len(args) == 1
             and isinstance(args[0], TupleVariable)
         ):
             assert not kwargs
-            return TupleVariable(self.items + args[0].items, **options)
+            return TupleVariable(self.items + args[0].items).trace(self, args, kwargs)
         elif (
             name in ("__add__", "__iadd__")
             and len(args) == 1
@@ -237,8 +236,8 @@ class TupleVariable(BaseListVariable):
         ):
             assert not kwargs
             return TupleVariable(
-                self.items + list(args[0].unpack_var_sequence(self)), **options
-            )
+                self.items + list(args[0].unpack_var_sequence(self))
+            ).trace(self, args, kwargs)
         return super().call_method(tx, name, args, kwargs)
 
 
