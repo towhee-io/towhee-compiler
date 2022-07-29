@@ -247,7 +247,7 @@ class DataClassVariable(ConstDictVariable):
     ) -> VariableTracker:
         options = variables.propagate(self, args, kwargs.values())
         if name == "__post_init__":
-            user_fn = variables.UserMethodVariable(self.user_cls.__post_init__, self)
+            user_fn = variables.usermethod(self.user_cls.__post_init__, self)
             return user_fn.call_function(tx, [], {})
         elif name == "__getitem__":
             assert not kwargs and len(args) == 1

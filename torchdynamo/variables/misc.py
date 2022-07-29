@@ -66,11 +66,11 @@ class SuperVariable(VariableTracker):
         if inner_fn is object.__init__:
             return LambdaVariable(identity, **options)
         elif isinstance(inner_fn, types.FunctionType):
-            return variables.UserFunctionVariable(inner_fn, **options).call_function(
+            return variables.userfunc(inner_fn, **options).call_function(
                 tx, [self.objvar] + args, kwargs
             )
         elif isinstance(inner_fn, types.MethodType):
-            return variables.UserMethodVariable(
+            return variables.usermethod(
                 inner_fn.__func__, self.objvar, **options
             ).call_function(tx, args, kwargs)
         else:
@@ -385,9 +385,9 @@ class AutogradFunctionVariable(VariableTracker):
 
         args = [BlackHoleVariable()] + list(args)
         options = VariableTracker.propagate(self, args, kwargs.values())
-        return variables.UserFunctionVariable(
-            self.fn_cls.forward, **options
-        ).call_function(tx, args, kwargs)
+        return variables.userfunc(self.fn_cls.forward, **options).call_function(
+            tx, args, kwargs
+        )
 
 
 class BlackHoleVariable(VariableTracker):
