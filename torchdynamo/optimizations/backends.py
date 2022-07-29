@@ -113,7 +113,7 @@ def ofi(subgraph):
 @create_backend
 def nebullvm(subgraph):
     from nebullvm import optimize_torch_model
-    from nebullvm.inference_learners.base import LearnerMetadata
+    from nebullvm.inference_learners.onnx import PytorchONNXInferenceLearner
 
     model = subgraph.model
     inputs = subgraph.example_inputs
@@ -126,7 +126,7 @@ def nebullvm(subgraph):
         if cached_model_dir.exists():
             if debug:
                 print(f"Found the cached model in ", str_cached_model_dir)
-            return LearnerMetadata.load(str_cached_model_dir).load_model(str_cached_model_dir)
+            return PytorchONNXInferenceLearner.load(str_cached_model_dir)
         else:
             if debug:
                 print(f"Saving the model to ", str_cached_model_dir)
