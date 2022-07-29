@@ -1,10 +1,10 @@
 import re
 import types
-from typing import Dict
-from typing import List
+from typing import Dict, Sequence
 
 import torch._C
 import torch.nn
+from typeguard import typechecked
 
 from torchdynamo.variables.lists import TupleVariable
 from torchdynamo.variables.misc import ProfileRecordFunctionVariable
@@ -81,15 +81,16 @@ class TorchVariable(VariableTracker):
             return True
         return getattr(self.value, "__module__", None) == "math"
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         from . import ConstantVariable
         from . import GradModeVariable
         from . import TensorVariable
 
         constant_args = check_constant_args(args, kwargs)
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        options = variables.propagate(self, args, kwargs.values())
 
         if self.value in config.constant_functions:
             assert not args and not kwargs
@@ -352,15 +353,15 @@ class TorchVariable(VariableTracker):
 
         def handle_ntuple(value):
             if value.has_unpack_var_sequence(tx):
-                return variables.TupleVariable(
+                return variables.basetuple(
                     list(value.unpack_var_sequence(tx)),
-                    **VariableTracker.propagate(self, value, args, kwargs.values()),
+                    **variables.propagate(self, value, args, kwargs.values()),
                 )
             elif value.is_python_constant():
                 # constant prop through it
-                return variables.ConstantVariable(
+                return variables.constant(
                     torch.nn.modules.utils._ntuple(count)(value.as_python_constant()),
-                    **VariableTracker.propagate(self, value, args, kwargs.values()),
+                    **variables.propagate(self, value, args, kwargs.values()),
                 )
             else:
                 unimplemented(f"torch.nn.modules.utils._ntuple({value})")

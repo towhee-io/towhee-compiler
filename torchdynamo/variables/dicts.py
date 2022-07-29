@@ -2,8 +2,9 @@ import collections
 import dataclasses
 import functools
 import inspect
-from typing import Dict
-from typing import List
+from typing import Dict, Sequence
+
+from typeguard import typechecked
 
 from .. import variables
 from ..bytecode_transformation import create_instruction
@@ -38,18 +39,16 @@ class ConstDictVariable(VariableTracker):
 
     def getitem_const(self, arg: VariableTracker):
         index = arg.as_python_constant()
-        return self.items[index].add_options(self, arg)
+        return self.items[index].trace(self, arg)
 
+    @typechecked
     def call_method(
         self,
         tx,
         name: str,
-        args: List[VariableTracker],
+        args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
-    ) -> "VariableTracker":
-        from . import ConstantVariable
-        from . import TupleVariable
-
+    ) -> VariableTracker:
         options = variables.propagate(self, args, kwargs.values())
         val = self.items
 
@@ -238,14 +237,15 @@ class DataClassVariable(ConstDictVariable):
         result.append(create_instruction("CALL_FUNCTION_KW", result.pop().argval))
         return result
 
+    @typechecked
     def call_method(
         self,
         tx,
         name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
+        options = variables.propagate(self, args, kwargs.values())
         if name == "__post_init__":
             user_fn = variables.UserMethodVariable(self.user_cls.__post_init__, self)
             return user_fn.call_function(tx, [], {})
@@ -267,12 +267,13 @@ class DataClassVariable(ConstDictVariable):
             name = "__setitem__"
         return super(DataClassVariable, self).call_method(tx, name, args, kwargs)
 
-    def var_getattr(self, tx, name: str) -> "VariableTracker":
+    @typechecked
+    def var_getattr(self, tx, name: str) -> VariableTracker:
         if name in self.items:
             return self.call_method(tx, "__getitem__", [variables.constant(name)], {})
         elif not self.include_none:
             defaults = {f.name: f.default for f in dataclasses.fields(self.user_cls)}
             if name in defaults:
                 assert variables.is_literal(defaults[name])
-                return variables.constant(defaults[name]).add_options(self)
+                return variables.constant(defaults[name]).trace(self)
         super(DataClassVariable, self).var_getattr(tx, name)

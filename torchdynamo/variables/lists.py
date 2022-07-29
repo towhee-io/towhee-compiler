@@ -1,7 +1,8 @@
-from typing import Dict
+from typing import Dict, Sequence
 from typing import List
 
 import torch
+from typeguard import typechecked
 
 from .. import variables
 from ..bytecode_transformation import create_instruction
@@ -52,23 +53,24 @@ class BaseListVariable(VariableTracker):
                     items=self.items[index],
                     source=GetItemSource(self.source, index),
                     mutable_local=None,
-                ).add_options(arg, self)
+                ).trace(arg, self)
             else:
                 return self.clone(
                     items=self.items[index], mutable_local=None
-                ).add_options(arg, self)
+                ).trace(arg, self)
         else:
             assert isinstance(index, int)
-            return self.items[index].add_options(arg, self)
+            return self.items[index].trace(arg, self)
 
     def unpack_var_sequence(self, tx):
-        return [x.add_options(self) for x in self.items]
+        return [x.trace(self) for x in self.items]
 
+    @typechecked
     def call_method(
         self,
         tx,
         name: str,
-        args: List[VariableTracker],
+        args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> VariableTracker:
         options = variables.propagate(self, args, kwargs.values())
@@ -134,11 +136,12 @@ class ListVariable(BaseListVariable):
         codegen.foreach(self.items)
         return [create_instruction("BUILD_LIST", len(self.items))]
 
+    @typechecked
     def call_method(
         self,
         tx,
         name: str,
-        args: List[VariableTracker],
+        args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> VariableTracker:
         options = variables.propagate(self, args, kwargs.values())
@@ -284,7 +287,7 @@ class NamedTupleVariable(TupleVariable):
         fields = namedtuple_fields(self.tuple_cls)
         if name not in fields:
             unimplemented(f"NamedTupleVariable.{name}")
-        return self.items[fields.index(name)].add_options(self)
+        return self.items[fields.index(name)].trace(self)
 
     def call_hasattr(self, tx, name: str) -> VariableTracker:
         options = variables.propagate(self)
@@ -321,7 +324,7 @@ class SliceVariable(BaseListVariable):
         fields = ["start", "stop", "step"]
         if name not in fields:
             unimplemented(f"slice.{name}")
-        return self.items[fields.index(name)].add_options(self)
+        return self.items[fields.index(name)].trace(self)
 
 
 class ListIteratorVariable(VariableTracker):
@@ -336,7 +339,7 @@ class ListIteratorVariable(VariableTracker):
         assert self.mutable_local
         if self.index >= len(self.items):
             raise StopIteration()
-        return self.items[self.index].add_options(self), ListIteratorVariable(
+        return self.items[self.index].trace(self), ListIteratorVariable(
             self.items,
             self.index + 1,
             mutable_local=MutableLocal(),
@@ -349,7 +352,7 @@ class ListIteratorVariable(VariableTracker):
         return iter([x.as_python_constant() for x in self.items])
 
     def unpack_var_sequence(self, tx):
-        return [x.add_options(self) for x in self.items[self.index :]]
+        return [x.trace(self) for x in self.items[self.index :]]
 
     def reconstruct(self, codegen):
         remaining_items = self.items[self.index :]

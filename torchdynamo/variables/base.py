@@ -132,6 +132,13 @@ class VariableTracker:
         assert isinstance(options, dict)
         return self.add_guards(options.get("guards", set()))
 
+    def trace(self, var, *more):
+        if more:
+            return self.trace(var).trace(*more)
+        if isinstance(var, VariableTracker):
+            return self.add_guards(var.guards)
+        return self.add_guards(VariableTracker.propagate([var])["guards"])
+
     def __str__(self):
         blacklist = ["guards", "source", "mutable_local"]
         args = {k: v for k, v in self.__dict__.items() if k not in blacklist}
@@ -250,15 +257,15 @@ class VariableTracker:
             assert not kwargs
 
             attr_name = args[0].as_python_constant()
-            return self.var_getattr(tx, attr_name).add_options(self, args[0])
+            return self.var_getattr(tx, attr_name).trace(self, args[0])
         elif name == "__contains__":
             assert len(args) == 1
             assert args[0].is_python_constant()
             assert not kwargs
-            
+
             search = args[0].as_python_constant()
             result = search in self.value
-            return variables.constant(result).add_options(self, args, kwargs)
+            return variables.constant(result).trace(self, args, kwargs)
         raise unimplemented(f"call_method {type(self)}: {self} {name} {args} {kwargs}")
 
     def __init__(
