@@ -4,13 +4,10 @@ import itertools
 import re
 import types
 from typing import Dict
-from typing import List
 from typing import Sequence
 
 import torch.nn
 from typeguard import typechecked
-
-from torchdynamo.variables.lists import SliceVariable
 
 from .. import skipfiles
 from .. import variables
@@ -29,6 +26,7 @@ from ..utils import proxy_args_kwargs
 from .base import MutableLocal
 from .base import VariableTracker
 from .base import typestr
+from .lists import SliceVariable
 from .user_defined import UserDefinedObjectVariable
 
 
@@ -47,7 +45,7 @@ class NNModuleVariable(VariableTracker):
     def unpack_var_sequence(self, tx):
         # implement list/iter/tuple/etc calls
         base = tx.output.get_submodule(self.module_key)
-        options = VariableTracker.propagate([self])
+        options = variables.propagate([self])
         assert isinstance(
             base, (torch.nn.ModuleList, torch.nn.ParameterList, torch.nn.Sequential)
         ), typestr(base)
@@ -63,11 +61,11 @@ class NNModuleVariable(VariableTracker):
             for idx, submod in enumerate(base)
         ]
 
-    def call_hasattr(self, tx, name: str) -> "VariableTracker":
-        options = VariableTracker.propagate(self)
+    def call_hasattr(self, tx, name: str) -> VariableTracker:
+        options = variables.propagate(self)
         mod = tx.output.get_submodule(self.module_key)
         result = hasattr(mod, name)
-        return variables.ConstantVariable(result, **options).add_guard(
+        return variables.constant(result, **options).add_guard(
             NNModuleSource(AttrSource(self.source, name)).create_guard(
                 GuardBuilder.HASATTR
             )
@@ -143,10 +141,11 @@ class NNModuleVariable(VariableTracker):
 
         return variables.GetAttrVariable(self, name, **options)
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
+        options = variables.propagate(self, args, kwargs.values())
         mod = tx.output.get_submodule(self.module_key)
         is_lazy = is_lazy_module(mod)
         if (
@@ -204,15 +203,15 @@ class NNModuleVariable(VariableTracker):
     def call_method(
         self,
         tx,
-        name,
+        name: str,
         args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
-    ) -> "VariableTracker":
+    ) -> VariableTracker:
         from . import ConstantVariable
         from . import ListIteratorVariable
         from . import TupleVariable
 
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        options = variables.propagate(self, args, kwargs.values())
         key = self.module_key
         module = tx.output.get_submodule(key)
 
@@ -259,7 +258,7 @@ class NNModuleVariable(VariableTracker):
         def named_embed(name, obj):
             return TupleVariable(
                 [
-                    ConstantVariable(name, **options),
+                    variables.constant(name, **options),
                     tx.output.add_submodule(
                         obj,
                         key,
@@ -300,14 +299,14 @@ class NNModuleVariable(VariableTracker):
             return ListIteratorVariable(result, mutable_local=MutableLocal(), **options)
         elif name == "__len__":
             assert not (args or kwargs)
-            return ConstantVariable(len(module), **options)
+            return variables.constant(len(module), **options)
         elif (
             name == "__contains__"
             and isinstance(module, (torch.nn.ModuleDict, torch.nn.ParameterDict))
             and args
             and args[0].is_python_constant()
         ):
-            return ConstantVariable(
+            return variables.constant(
                 args[0].as_python_constant() in module._modules, **options
             )
         elif name == "__getitem__":
@@ -352,7 +351,9 @@ class NNModuleVariable(VariableTracker):
             assert type(module) is torch.nn.ModuleList
             assert self.source
 
-            return ConstantVariable(module._get_abs_string_index(args[0].as_python_constant()), **options)
+            return ConstantVariable(
+                module._get_abs_string_index(args[0].as_python_constant()), **options
+            )
         else:
             return super().call_method(tx, name, args, kwargs)
 
@@ -396,18 +397,19 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
         ):
             assert self.source
             return [
-                VariableBuilder(tx, source=GetItemSource(self.source, idx))(
-                    item
-                ).add_options(self)
+                VariableBuilder(tx, source=GetItemSource(self.source, idx))(item).trace(
+                    self
+                )
                 for idx, item in enumerate(self.value)
             ]
 
         return super().unpack_var_sequence(tx)
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
+        options = variables.propagate(self, args, kwargs.values())
 
         # TODO mlazos: only support __call__ for lazy modules
         # until we can support a larger swath of python
@@ -420,16 +422,17 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
             tx, [self] + list(args), kwargs
         )
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         from .builder import VariableBuilder
 
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        options = variables.propagate(self, args, kwargs.values())
 
         if name not in getattr(self.value, "__dict__", {}):
             try:
@@ -445,9 +448,9 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
                 items = []
                 for name, value in self.value.named_parameters():
                     items.append(
-                        VariableBuilder(tx, AttrSource(self.source, name))(
-                            value
-                        ).add_options(options)
+                        VariableBuilder(tx, AttrSource(self.source, name))(value).trace(
+                            options
+                        )
                     )
                 return variables.ListIteratorVariable(
                     items, mutable_local=MutableLocal(), **options

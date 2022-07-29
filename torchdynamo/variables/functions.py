@@ -2,8 +2,9 @@ import functools
 import inspect
 import itertools
 import types
-from typing import Dict
-from typing import List
+from typing import Dict, Sequence
+
+from typeguard import typechecked
 
 import torchdynamo.side_effects
 
@@ -19,14 +20,14 @@ from .base import typestr
 
 def wrap_bound_arg(val, options):
     if isinstance(val, dict):
-        return variables.ConstDictVariable(
+        return variables.constdict(
             {k: wrap_bound_arg(v, options) for k, v in val.items()}, dict, **options
         )
     elif isinstance(val, (tuple, list)):
         cls = variables.BaseListVariable.cls_for(type(val))
         return cls([wrap_bound_arg(x, options) for x in val], **options)
-    elif variables.ConstantVariable.is_literal(val):
-        return variables.ConstantVariable(val, **options)
+    elif variables.is_literal(val):
+        return variables.constant(val, **options)
     else:
         assert isinstance(val, VariableTracker), typestr(val)
         return val
@@ -58,9 +59,10 @@ class BaseUserFunctionVariable(VariableTracker):
     def get_name(self):
         return self.get_code().co_name
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         return tx.inline_user_function_return(
             self, list(self.self_args()) + list(args), kwargs
         )
@@ -74,7 +76,7 @@ class BaseUserFunctionVariable(VariableTracker):
 
 class UserFunctionVariable(BaseUserFunctionVariable):
     """Some unsupported user-defined global function"""
-    
+
     _python_type_ = types.FunctionType
 
     def __init__(self, fn, **kwargs):
@@ -102,7 +104,7 @@ class UserFunctionVariable(BaseUserFunctionVariable):
         return self.fn.__globals__
 
     def bind_args(self, parent, args, kwargs):
-        options = VariableTracker.propagate([self])
+        options = variables.propagate([self])
         wrap = functools.partial(wrap_bound_arg, options=options)
 
         fn: types.FunctionType = self.fn
@@ -173,7 +175,7 @@ class UserFunctionVariable(BaseUserFunctionVariable):
 
 class UserMethodVariable(UserFunctionVariable):
     """Some unsupported user-defined method"""
-    
+
     _python_type_ = types.MethodType
 
     def __init__(self, fn, obj, **kwargs):
@@ -183,15 +185,14 @@ class UserMethodVariable(UserFunctionVariable):
     def self_args(self):
         return [self.obj]
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         if isinstance(self.obj, variables.NNModuleVariable) and getattr(
             self.fn, "__module__", ""
         ).startswith("torch.nn."):
-            return self.obj.call_method(tx, self.fn.__name__, args, kwargs).add_options(
-                self
-            )
+            return self.obj.call_method(tx, self.fn.__name__, args, kwargs).trace(self)
         return super().call_function(tx, args, kwargs)
 
     def num_parameters(self):

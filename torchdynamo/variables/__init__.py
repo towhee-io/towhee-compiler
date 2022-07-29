@@ -51,8 +51,16 @@ def constant(*args, **kwargs):
     return ConstantVariable(*args, **kwargs)
 
 
+def baselist(*args, **kwargs):
+    return ListVariable(*args, **kwargs)
+
+
 def basetuple(*args, **kwargs):
     return TupleVariable(*args, **kwargs)
+
+
+def constdict(*args, **kwargs):
+    return ConstDictVariable(*args, **kwargs)
 
 
 __all__ = [

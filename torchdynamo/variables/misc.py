@@ -1,10 +1,11 @@
 import inspect
 import sys
 import types
-from typing import Dict
+from typing import Dict, Sequence
 from typing import List
 
 import torch._C
+from typeguard import typechecked
 
 from .. import variables
 from ..bytecode_transformation import create_instruction
@@ -50,14 +51,15 @@ class SuperVariable(VariableTracker):
         # TODO(jansel): there is a small chance this could trigger user code, prevent that
         return getattr(super(search_type, type_to_use), name)
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
+        options = variables.propagate(
             self, args, kwargs.values(), self.objvar, self.typevar
         )
         inner_fn = self.const_getattr(self, name)
@@ -117,11 +119,11 @@ class ContextWrappingVariable(ContextManagerVariable):
 
     def enter(self, tx):
         self._call_func(tx, self.target_value)
-        return variables.ConstantVariable(None, **VariableTracker.propagate(self))
+        return variables.constant(None, **variables.propagate(self))
 
     def exit(self, tx, *args):
         self._call_func(tx, self.initial_value)
-        return variables.ConstantVariable(None, **VariableTracker.propagate(self))
+        return variables.constant(None, **variables.propagate(self))
 
     def reconstruct(self, codegen, target_inst=None):
         """
@@ -315,9 +317,10 @@ class WithExitFunctionVariable(VariableTracker):
         self.ctx = ctx
         self.target = target
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         assert not kwargs
         return self.ctx.exit(tx, *args)
 
@@ -390,17 +393,16 @@ class AutogradFunctionVariable(VariableTracker):
 class BlackHoleVariable(VariableTracker):
     """A autograd.function context that just ignores everything (for forward extraction)"""
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        name: str,
+        args: List[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         assert name in ("__setattr__", "save_for_backward"), name
-        return variables.ConstantVariable(
-            None, **VariableTracker.propagate(self, args, kwargs.values())
-        )
+        return variables.constant(None).trace(self, args, kwargs)
 
 
 class LambdaVariable(VariableTracker):
@@ -411,7 +413,7 @@ class LambdaVariable(VariableTracker):
     def call_function(
         self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
     ) -> "VariableTracker":
-        return self.fn(*args, **kwargs).add_options(self)
+        return self.fn(*args, **kwargs).trace(self)
 
 
 class GetAttrVariable(VariableTracker):
@@ -496,8 +498,8 @@ class GetAttrVariable(VariableTracker):
                     )
 
         if isinstance(self.obj, AutogradFunctionVariable) and self.name == "apply":
-            return self.obj.call_apply(tx, args, kwargs).add_options(self)
-        return self.obj.call_method(tx, self.name, args, kwargs).add_options(self)
+            return self.obj.call_apply(tx, args, kwargs).trace(self)
+        return self.obj.call_method(tx, self.name, args, kwargs).trace(self)
 
     def call_method(
         self,
@@ -540,7 +542,6 @@ class SkipFilesVariable(VariableTracker):
 
 
 class TypingVariable(VariableTracker):
-
     def call_method(
         self,
         tx,
@@ -560,4 +561,5 @@ class NumpyVariable(VariableTracker):
     """
     Wrapper around `numpy.*` for better error messages.
     """
+
     pass
