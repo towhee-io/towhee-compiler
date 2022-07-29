@@ -1,13 +1,11 @@
 import re
 import types
-from typing import Dict, Sequence
+from typing import Dict
+from typing import Sequence
 
 import torch._C
 import torch.nn
 from typeguard import typechecked
-
-from torchdynamo.variables.lists import TupleVariable
-from torchdynamo.variables.misc import ProfileRecordFunctionVariable
 
 from .. import config
 from .. import variables
@@ -18,11 +16,14 @@ from ..utils import istype
 from ..utils import product
 from ..utils import proxy_args_kwargs
 from .base import VariableTracker
+from .lists import TupleVariable
+from .misc import ProfileRecordFunctionVariable
 from .tensor import TensorWithTFOverrideVariable
 
 
 class TorchVariable(VariableTracker):
     """Points to a module or method in torch.*"""
+
     _as_python_constant_ = "self"
     _as_proxy_ = "self"
 
@@ -85,7 +86,6 @@ class TorchVariable(VariableTracker):
     def call_function(
         self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
     ) -> VariableTracker:
-        from . import ConstantVariable
         from . import GradModeVariable
         from . import TensorVariable
 
@@ -94,10 +94,10 @@ class TorchVariable(VariableTracker):
 
         if self.value in config.constant_functions:
             assert not args and not kwargs
-            return ConstantVariable(config.constant_functions[self.value], **options)
+            return variables.constant(config.constant_functions[self.value], **options)
         elif self.can_constant_fold_through() and constant_args:
             # constant fold
-            return ConstantVariable(
+            return variables.constant(
                 self.as_python_constant()(
                     *[x.as_python_constant() for x in args],
                     **{k: v.as_python_constant() for k, v in kwargs.items()},
@@ -122,9 +122,9 @@ class TorchVariable(VariableTracker):
             and args[0].dtype is not None
         ):
             if self.value in (torch.is_tensor, torch.overrides.is_tensor_like):
-                return ConstantVariable(True, **options)
+                return variables.constant(True, **options)
             elif self.value is torch.is_floating_point:
-                return ConstantVariable(args[0].dtype.is_floating_point, **options)
+                return variables.constant(args[0].dtype.is_floating_point, **options)
             else:
                 assert False
         elif (
@@ -132,7 +132,7 @@ class TorchVariable(VariableTracker):
             and isinstance(args[0], TensorVariable)
             and args[0].size is not None
         ):
-            return ConstantVariable(product(args[0].size), **options)
+            return variables.constant(product(args[0].size), **options)
         elif self.value in (
             torch.nn.modules.utils._single,
             torch.nn.modules.utils._pair,
@@ -149,7 +149,7 @@ class TorchVariable(VariableTracker):
             return GradModeVariable(args[0].as_python_constant(), **options)
         elif self.value is torch.is_grad_enabled:
             assert not (args or kwargs)
-            return ConstantVariable(torch.is_grad_enabled(), **options).add_guards(
+            return variables.constant(torch.is_grad_enabled(), **options).add_guards(
                 GradModeVariable._guards_singleton
             )
         elif not config.dynamic_shapes and self.is_dynamic_shapes(args, kwargs):
@@ -222,11 +222,15 @@ class TorchVariable(VariableTracker):
     def is_dynamic_shapes(self, args, kwargs):
         """Check for dynamic shapes when shape specialization is enabled"""
         # TODO(jansel): need to get a complete list
-        if self.value in (
-            torch.nonzero,
-            torch.unique,
-            torch.unique_consecutive,
-        ) or self.value.__name__ in ("nms",):
+        if (
+            self.value
+            in (
+                torch.nonzero,
+                torch.unique,
+                torch.unique_consecutive,
+            )
+            or self.value.__name__ in ("nms",)
+        ):
             return True
 
         if self.value is torch.where and len(args) + len(kwargs) == 1:
@@ -236,7 +240,7 @@ class TorchVariable(VariableTracker):
             torch.arange,
             torch.repeat_interleave,
         ):
-            none = variables.ConstantVariable(None)
+            none = variables.constant(None)
 
             def has_non_const(it):
                 return not all(x.is_python_constant() for x in it)
@@ -253,7 +257,7 @@ class TorchVariable(VariableTracker):
 
     def _call_softmax(self, tx, args, kwargs, options):
         """rewrite the pattern nn.Softmax(dim=-1)(x) to F.softmax(x, -1)"""
-        dim = args[0] if args else kwargs.get("dim", variables.ConstantVariable(None))
+        dim = args[0] if args else kwargs.get("dim", variables.constant(None))
 
         def fake_softmax(input):
             return variables.TensorVariable.create(
@@ -278,15 +282,14 @@ class TorchVariable(VariableTracker):
 
         non functional loss call: input, target, optional_output
         """
-        from . import ConstantVariable
 
         def normalize_args(
-            weight=ConstantVariable(None),
-            size_average=ConstantVariable(None),
-            ignore_index=ConstantVariable(-100),
-            reduce=ConstantVariable(None),
-            reduction=ConstantVariable("mean"),
-            label_smoothing=ConstantVariable(0.0),
+            weight=variables.constant(None),
+            size_average=variables.constant(None),
+            ignore_index=variables.constant(-100),
+            reduce=variables.constant(None),
+            reduction=variables.constant("mean"),
+            label_smoothing=variables.constant(0.0),
         ):
             return (
                 weight,
