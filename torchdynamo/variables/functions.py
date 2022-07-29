@@ -2,7 +2,7 @@ import functools
 import inspect
 import itertools
 import types
-from typing import Dict, Sequence
+from typing import Any, Dict, Sequence
 
 from typeguard import typechecked
 
@@ -79,11 +79,9 @@ class UserFunctionVariable(BaseUserFunctionVariable):
 
     _python_type_ = types.FunctionType
 
-    def __init__(self, fn, **kwargs):
+    @typechecked
+    def __init__(self, fn: types.FunctionType, **kwargs: Any):
         super(UserFunctionVariable, self).__init__(**kwargs)
-        assert isinstance(
-            fn, types.FunctionType
-        ), f"expected FunctionType {typestr(fn)} {fn}"
         # unpack @torchdynamo.optimize()(fn) wrapped function
         fn = inspect.getattr_static(fn, "_torchdynamo_inline", fn)
         self.fn: types.FunctionType = fn
