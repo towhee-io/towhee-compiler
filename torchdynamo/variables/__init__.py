@@ -59,8 +59,22 @@ def basetuple(*args, **kwargs):
     return TupleVariable(*args, **kwargs)
 
 
+def listiter(*args, **kwargs):
+    return ListIteratorVariable(*args, **kwargs)
+
+
 def constdict(*args, **kwargs):
     return ConstDictVariable(*args, **kwargs)
+
+
+def userfunc(*args, **kwargs):
+    return UserFunctionVariable(*args, **kwargs)
+
+def usermethod(*args, **kwargs):
+    return UserMethodVariable(*args, **kwargs)
+
+def torch(*args, **kwargs):
+    return TorchVariable(*args, **kwargs)
 
 
 __all__ = [

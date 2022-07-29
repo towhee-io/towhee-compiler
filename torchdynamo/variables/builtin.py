@@ -328,12 +328,12 @@ class BuiltinVariable(VariableTracker):
             # convert min/max to torch ops
             if b.is_python_constant():
                 kwargs = {"min": b} if (self.fn is max) else {"max": b}
-                result = variables.TorchVariable(torch.clamp).call_function(
+                result = variables.torch(torch.clamp).call_function(
                     tx, [a], kwargs
                 )
             else:
                 fn = {max: torch.maximum, min: torch.minimum}[self.fn]
-                result = variables.TorchVariable(fn).call_function(tx, [a, b], {})
+                result = variables.torch(fn).call_function(tx, [a, b], {})
 
             # return unspec if both a, b are unspec or const
             if all(
@@ -622,16 +622,16 @@ class BuiltinVariable(VariableTracker):
         elif isinstance(obj, TorchVariable):
             member = getattr(obj.value, name)
             if is_allowed(member):
-                return TorchVariable(member, **options)
-            elif ConstantVariable.is_literal(member):
-                return ConstantVariable(member, **options)
+                return variables.torch(member, **options)
+            elif variables.is_literal(member):
+                return variables.constant(member, **options)
             else:
                 return VariableBuilder(tx, source)(member).add_guards(guards)
         elif isinstance(obj, PythonModuleVariable):
             member = obj.value.__dict__[name]
             return VariableBuilder(tx, source)(member).add_guards(guards)
         elif istype(obj, UserFunctionVariable) and name in ("__name__", "__module__"):
-            return ConstantVariable(
+            return variables.constant(
                 getattr(obj.fn, name), **VariableTracker.propagate(obj)
             )
         else:
