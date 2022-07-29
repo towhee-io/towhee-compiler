@@ -123,13 +123,9 @@ class OutputGraph(fx.Tracer):
         return count_calls(self.graph)
 
     def get_submodule(self, keys):
-        assert keys
         obj = self.nn_modules
         for k in keys.split("."):
-            if isinstance(obj, dict):
-                obj = obj[k]
-            else:
-                obj = getattr(obj, k)
+            obj = obj[k] if isinstance(obj, dict) else getattr(obj, k)
         return obj
 
     def create_graph_input(self, name, type_expr=None):
@@ -168,7 +164,6 @@ class OutputGraph(fx.Tracer):
         if is_dynamic_nn_module(mod):
             return variables.UnspecializedNNModuleVariable(mod, **options)
 
-        options = dict(options)
         options["guards"] = set(options.get("guards", []))
         source: Source = options["source"]
         if isinstance(mod, torch.Tensor):

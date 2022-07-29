@@ -9,14 +9,16 @@ import operator
 import sys
 import traceback
 import types
-import typing
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import Iterable
 from typing import List
+from typing import Optional
 from unittest.mock import patch
 
 import torch
+from typeguard import typechecked
 
 import torchdynamo.side_effects
 import torchdynamo.variables.base
@@ -91,7 +93,7 @@ class BlockStackEntry:
         return self.with_context.exit(tx)
 
 
-def stack_op(fn: typing.Callable):
+def stack_op(fn: Callable):
     nargs = len(inspect.signature(fn).parameters)
     fn_var = BuiltinVariable(fn)
 
@@ -102,7 +104,7 @@ def stack_op(fn: typing.Callable):
     return impl
 
 
-def generic_jump(truth_fn: typing.Callable, push: bool):
+def generic_jump(truth_fn: Callable, push: bool):
     def inner(self: "InstructionTranslatorBase", inst: Instruction):
         value: VariableTracker = self.pop()
         self.output.guards.update(value.guards)
@@ -205,19 +207,13 @@ class InstructionTranslatorBase(object):
         )
         self.output.side_effects.prune_dead_object_new(self)
 
+    @typechecked
     def call_function(
         self,
         fn: VariableTracker,
         args: List[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ):
-        assert isinstance(fn, VariableTracker)
-        assert isinstance(args, list)
-        assert isinstance(kwargs, dict)
-        assert all(
-            isinstance(x, VariableTracker)
-            for x in itertools.chain(args, kwargs.values())
-        )
         self.push(fn.call_function(self, args, kwargs))
 
     def update_locals_and_stack(self, oldvar: VariableTracker, newvar: VariableTracker):
@@ -259,7 +255,7 @@ class InstructionTranslatorBase(object):
         except Exception:
             self.restore_graphstate(state)
             raise
-        
+
     def simulator(self):
         while True:
             if self.instruction_pointer is None:
@@ -274,8 +270,9 @@ class InstructionTranslatorBase(object):
             if self.current_instruction.starts_line:
                 self.lineno = self.current_instruction.starts_line
             yield self.current_instruction
-            
+
     def emit(self, inst):
+        # FIXME: drop checkpoint logic
         if len(self.stack) == 0 and self.should_compile_partial_graph():
             self.checkpoint = inst, self.copy_graphstate()
 
@@ -283,15 +280,15 @@ class InstructionTranslatorBase(object):
             unimplemented(f"missing: {inst.opname}")
 
         try:
-            if not hasattr(self, inst.opname):
-                unimplemented(f"missing: {inst.opname}")
             getattr(self, inst.opname)(inst)
             return inst.opname != "RETURN_VALUE"
         except Unsupported as exc:
             exc.real_stack.append(self.frame_summary())
+            print(f"Unsupported Instruction: {inst}")
             if self.empty_checkpoint():
                 raise
 
+        # FIXME: drop checkpoint logic
         # generate code from checkpoint
         assert not self.output.output_instructions
         continue_inst, state = self.checkpoint
@@ -301,7 +298,7 @@ class InstructionTranslatorBase(object):
             [create_instruction("JUMP_ABSOLUTE", target=continue_inst)]
             + self.instructions
         )
-        
+
     def run(self):
         try:
             for inst in self.simulator():
@@ -336,7 +333,8 @@ class InstructionTranslatorBase(object):
             if isinstance(self, InstructionTranslator):
                 self.output.cleanup()
 
-    def push(self, val):
+    @typechecked
+    def push(self, val: Optional[VariableTracker]):
         assert val is None or isinstance(
             val, VariableTracker
         ), f"push expects VariableTracker, got {typestr(val)}"
@@ -1163,7 +1161,7 @@ class InstructionTranslatorBase(object):
         self.stack: List[VariableTracker] = []
         self.instruction_pointer: int = 0
         self.current_instruction: Instruction = create_instruction("NOP")
-        self.next_instruction: typing.Optional[Instruction] = None
+        self.next_instruction: Optional[Instruction] = None
         self.block_stack: List[BlockStackEntry] = []
         self.lineno: int = code_options.get("co_firstlineno")
 
