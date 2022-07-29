@@ -52,12 +52,10 @@ class VariableTracker:
 
         def visit(var):
             if type(var) in (list, tuple, dict_values, odict_values):
-                for i in var:
-                    visit(i)
+                map(visit, var)
             elif isinstance(var, variables.BaseListVariable):
                 guards.update(var.guards)
-                for i in var.items:
-                    visit(i)
+                map(visit, var.items)
             elif isinstance(var, variables.ConstDictVariable):
                 guards.update(var.guards)
                 visit(var.items.values())
@@ -190,11 +188,11 @@ class VariableTracker:
         """getattr(self, name) returning a new variable"""
         options = VariableTracker.propagate(self)
         value = self.const_getattr(tx, name)
-        if not variables.ConstantVariable.is_literal(value):
+        if not variables.is_literal(value):
             raise NotImplementedError()
         if self.source:
             options["source"] = AttrSource(self.source, name)
-        return variables.ConstantVariable(value, **options)
+        return variables.constant(value, **options)
 
     def is_proxy(self):
         try:
@@ -236,24 +234,31 @@ class VariableTracker:
     def call_method(
         self,
         tx,
-        name,
+        name: str,
         args: "List[VariableTracker]",
         kwargs: "Dict[str, VariableTracker]",
     ) -> "VariableTracker":
-        if name == "__len__" and self.has_unpack_var_sequence(tx):
+        if name == "__len__":
             assert not (args or kwargs)
-            return variables.ConstantVariable(
-                len(self.unpack_var_sequence(tx)), **VariableTracker.propagate(self)
-            )
-        elif (
-            name == "__getattr__"
-            and len(args) == 1
-            and args[0].is_python_constant()
-            and not kwargs
-        ):
-            return self.var_getattr(tx, args[0].as_python_constant()).add_options(
-                self, args[0]
-            )
+            assert self.has_unpack_var_sequence(tx)
+
+            length = len(self.unpack_var_sequence(tx))
+            return variables.constant(length, **variables.propagate(self))
+        elif name == "__getattr__":
+            assert len(args) == 1
+            assert args[0].is_python_constant()
+            assert not kwargs
+
+            attr_name = args[0].as_python_constant()
+            return self.var_getattr(tx, attr_name).add_options(self, args[0])
+        elif name == "__contains__":
+            assert len(args) == 1
+            assert args[0].is_python_constant()
+            assert not kwargs
+            
+            search = args[0].as_python_constant()
+            result = search in self.value
+            return variables.constant(result).add_options(self, args, kwargs)
         raise unimplemented(f"call_method {type(self)}: {self} {name} {args} {kwargs}")
 
     def __init__(

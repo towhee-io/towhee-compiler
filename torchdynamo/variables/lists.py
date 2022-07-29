@@ -34,7 +34,10 @@ class BaseListVariable(VariableTracker):
         return [x.as_proxy() for x in self.items]
 
     def as_python_constant(self):
-        if isinstance(self._as_python_constant_, str) and self._as_python_constant_ == "self":
+        if (
+            isinstance(self._as_python_constant_, str)
+            and self._as_python_constant_ == "self"
+        ):
             return super().as_python_constant()
         return self.python_type()([x.as_python_constant() for x in self.items])
 
@@ -64,11 +67,11 @@ class BaseListVariable(VariableTracker):
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        name: str,
+        args: List[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
+        options = variables.propagate(self, args, kwargs.values())
         if name == "__getitem__":
             assert not kwargs and len(args) == 1
             return self.getitem_const(args[0])
@@ -84,7 +87,7 @@ class BaseListVariable(VariableTracker):
             assert not kwargs
             search = args[0].as_python_constant()
             result = any(x.as_python_constant() == search for x in self.items)
-            return variables.ConstantVariable(result, **options)
+            return variables.constant(result, **options)
 
         return super(BaseListVariable, self).call_method(tx, name, args, kwargs)
 
@@ -95,7 +98,7 @@ class RangeVariable(BaseListVariable):
 
     def __init__(self, value, items=None, guards=None, **kwargs):
         if items is None:
-            items = [variables.ConstantVariable(x, guards=guards) for x in value]
+            items = [variables.constant(x, guards=guards) for x in value]
         super().__init__(items, guards=guards, **kwargs)
         self.value = value
 
@@ -134,19 +137,19 @@ class ListVariable(BaseListVariable):
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        name: str,
+        args: List[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
+        options = variables.propagate(self, args, kwargs.values())
         if name == "append" and self.mutable_local:
             assert not kwargs
-            (arg,) = args
+            assert len(args) == 1
             tx.replace_all(
                 self,
-                ListVariable(self.items + [arg], **options),
+                ListVariable(self.items + args, **options),
             )
-            return ConstantVariable(None)
+            return variables.constant(None)
         elif (
             name in ("extend", "__iadd__")
             and self.mutable_local
@@ -154,11 +157,11 @@ class ListVariable(BaseListVariable):
             and args[0].has_unpack_var_sequence(tx)
         ):
             assert not kwargs
-            (arg,) = args
+            assert len(args) == 1
             return tx.replace_all(
                 self,
                 ListVariable(
-                    list(self.items) + list(arg.unpack_var_sequence(tx)),
+                    list(self.items) + list(args[0].unpack_var_sequence(tx)),
                     **options,
                 ),
             )
@@ -212,11 +215,11 @@ class TupleVariable(BaseListVariable):
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        name: str,
+        args: List[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
+        options = variables.propagate(self, args, kwargs.values())
         if (
             name in ("__add__", "__iadd__")
             and len(args) == 1
@@ -227,7 +230,7 @@ class TupleVariable(BaseListVariable):
         elif (
             name in ("__add__", "__iadd__")
             and len(args) == 1
-            and isinstance(args[0], variables.ConstantVariable)
+            and isinstance(args[0], ConstantVariable)
         ):
             assert not kwargs
             return TupleVariable(
@@ -238,6 +241,7 @@ class TupleVariable(BaseListVariable):
 
 class SizeVariable(TupleVariable):
     """torch.Size(...)"""
+
     _python_type_ = torch.Size
 
     def reconstruct(self, codegen):
@@ -282,17 +286,17 @@ class NamedTupleVariable(TupleVariable):
             unimplemented(f"NamedTupleVariable.{name}")
         return self.items[fields.index(name)].add_options(self)
 
-    def call_hasattr(self, tx, name: str) -> "VariableTracker":
-        options = VariableTracker.propagate(self)
+    def call_hasattr(self, tx, name: str) -> VariableTracker:
+        options = variables.propagate(self)
         fields = namedtuple_fields(self.tuple_cls)
-        return variables.ConstantVariable(name in fields, **options)
+        return variables.constant(name in fields, **options)
 
 
 class SliceVariable(BaseListVariable):
     _python_type_ = slice
 
     def __init__(self, items, **kwargs):
-        start, stop, step = [variables.ConstantVariable(None)] * 3
+        start, stop, step = [variables.constant(None)] * 3
         if len(items) == 1:
             (stop,) = items
         elif len(items) == 2:
