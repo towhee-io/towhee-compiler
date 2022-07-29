@@ -5,10 +5,11 @@ import importlib
 import inspect
 import random
 import types
-from typing import Dict
+from typing import Dict, Sequence
 from typing import List
 
 import torch.nn
+from typeguard import typechecked
 
 from .. import variables
 from ..exc import unimplemented
@@ -30,8 +31,9 @@ class UserDefinedVariable(VariableTracker):
 class UserDefinedClassVariable(UserDefinedVariable):
     _as_python_constant_ = "self"
 
-    def var_getattr(self, tx, name: str) -> "VariableTracker":
-        options = VariableTracker.propagate(self)
+    @typechecked
+    def var_getattr(self, tx, name: str) -> VariableTracker:
+        options = variables.propagate(self)
         try:
             obj = inspect.getattr_static(self.value, name)
         except AttributeError:
@@ -44,20 +46,21 @@ class UserDefinedClassVariable(UserDefinedVariable):
 
         return super(UserDefinedClassVariable, self).var_getattr(tx, name)
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         if (
             name == "__subclasses__"
             and len(args) == 0
             and not kwargs
             and "__subclasses__" not in self.value.__dict__
         ):
-            options = VariableTracker.propagate(self, args, kwargs.values())
+            options = variables.propagate(self, args, kwargs.values())
             options["mutable_local"] = MutableLocal()
             subs_as_vars: List[VariableTracker] = list()
             for sub in self.value.__subclasses__():
@@ -66,16 +69,17 @@ class UserDefinedClassVariable(UserDefinedVariable):
                     variables.UserDefinedClassVariable(sub, source=source)
                 )
 
-            return variables.ListVariable(subs_as_vars, **options)
+            return variables.baselist(subs_as_vars, **options)
 
         return super().call_method(tx, args, kwargs)
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         from ..side_effects import SideEffects
 
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        options = variables.propagate(self, args, kwargs.values())
 
         if is_namedtuple_cls(self.value):
             fields = namedtuple_fields(self.value)
@@ -86,7 +90,7 @@ class UserDefinedClassVariable(UserDefinedVariable):
                 items[fields.index(name)] = value
             assert all(x is not None for x in items)
             return variables.NamedTupleVariable(
-                items, self.value, **VariableTracker.propagate(self, items)
+                items, self.value, **variables.propagate(self, items)
             )
         elif (
             inspect.getattr_static(self.value, "__new__", None) in (object.__new__,)
@@ -113,6 +117,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
     """
     Mostly objects of defined type.  Catch-all for something where we only know the type.
     """
+
     # _python_type_ = "self"
 
     def __init__(self, value, value_type=None, **kwargs):
@@ -126,7 +131,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         if inner == "builtin_function_or_method":
             inner = str(getattr(self.value, "__name__", None))
         return f"{self.__class__.__name__}({inner})"
-    
+
     def python_type(self):
         return self.value_type
 
@@ -142,18 +147,19 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         }
         return fns
 
+    @typechecked
     def call_method(
         self,
         tx,
         name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         from . import ConstantVariable
         from . import TupleVariable
         from . import UserMethodVariable
 
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        options = variables.propagate(self, args, kwargs.values())
 
         if name not in getattr(self.value, "__dict__", {}):
             try:
@@ -217,9 +223,10 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             # TypeError: unhashable type
             return False
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         from .builder import VariableBuilder
 
         if (
@@ -297,7 +304,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
 
         if (
             name in getattr(value, "__dict__", {})
-            or ConstantVariable.is_literal(subobj)
+            or variables.is_literal(subobj)
             or isinstance(
                 subobj,
                 (
@@ -308,7 +315,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         ):
             if source:
                 return VariableBuilder(tx, source)(subobj).add_options(options)
-            elif ConstantVariable.is_literal(subobj):
+            elif variables.is_literal(subobj):
                 return ConstantVariable(subobj, **options)
 
         if (
@@ -317,10 +324,13 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             and not callable(value)
         ):
             if not source:
-                assert getattr(
-                    importlib.import_module(type(value).__module__),
-                    type(value).__name__,
-                ) is type(value)
+                assert (
+                    getattr(
+                        importlib.import_module(type(value).__module__),
+                        type(value).__name__,
+                    )
+                    is type(value)
+                )
                 source = AttrSource(
                     AttrSource(
                         tx.import_source(type(value).__module__), type(value).__name__
@@ -344,10 +354,10 @@ class UserDefinedObjectVariable(UserDefinedVariable):
 
         return variables.GetAttrVariable(self, name, source=source, **options)
 
-    def call_hasattr(self, tx, name: str) -> "VariableTracker":
+    def call_hasattr(self, tx, name: str) -> VariableTracker:
         if not self.source:
             unimplemented("hasattr no source")
-        options = VariableTracker.propagate(self)
+        options = variables.propagate(self)
         options["guards"].add(
             AttrSource(self.source, name).make_guard(GuardBuilder.HASATTR)
         )
@@ -356,9 +366,9 @@ class UserDefinedObjectVariable(UserDefinedVariable):
 
         try:
             self._getattr_static(name)
-            return variables.ConstantVariable(True, **options)
+            return variables.constant(True, **options)
         except AttributeError:
-            return variables.ConstantVariable(False, **options)
+            return variables.constant(False, **options)
 
     def odict_getitem(self, tx, key):
         from .builder import VariableBuilder
@@ -368,6 +378,6 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             ODictGetItemSource(self.source, key.as_python_constant()),
         )(
             collections.OrderedDict.__getitem__(self.value, key.as_python_constant())
-        ).add_options(
+        ).trace(
             key, self
         )

@@ -16,6 +16,7 @@ import torchdynamo
 
 from .. import mutation_guard
 from .. import skipfiles
+from .. import variables
 from ..allowed_functions import is_allowed
 from ..allowed_functions import is_builtin
 from ..allowed_functions import is_numpy
@@ -176,7 +177,7 @@ class VariableBuilder:
                 )
                 for k in value.keys()
             )
-            result = ConstDictVariable(result, type(value), guards=guards)
+            result = variables.constdict(result, type(value), guards=guards)
             if istype(value, dict):
                 return self.tx.output.side_effects.track_dict(
                     self.source, value, result
@@ -389,5 +390,5 @@ def _dataclasses_fields_lambda(obj):
             source = GetItemSource(
                 AttrSource(obj.source, "__dataclass_fields__"), field.name
             )
-        items.append(UserDefinedObjectVariable(field, source=source).add_options(obj))
-    return TupleVariable(items).add_options(obj)
+        items.append(UserDefinedObjectVariable(field, source=source).trace(obj))
+    return variables.basetuple(items).trace(obj)

@@ -21,7 +21,7 @@ class ConstantVariable(VariableTracker):
 
     def getitem_const(self, arg: VariableTracker):
         index = arg.as_python_constant()
-        return ConstantVariable(self.value[index]).add_options(self, arg)
+        return ConstantVariable(self.value[index]).trace(self, arg)
 
     @staticmethod
     def is_literal(obj):
@@ -33,7 +33,7 @@ class ConstantVariable(VariableTracker):
 
     def unpack_var_sequence(self, tx):
         try:
-            options = VariableTracker.propagate([self])
+            options = variables.propagate([self])
             return [ConstantVariable(x, **options) for x in self.as_python_constant()]
         except TypeError:
             raise NotImplementedError()

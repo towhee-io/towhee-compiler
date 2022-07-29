@@ -201,9 +201,9 @@ class TensorVariable(VariableTracker):
                         )
                     )
             if istype(example_value, tuple):
-                return variables.TupleVariable(unpacked, **options)
+                return variables.basetuple(unpacked, **options)
             elif istype(example_value, (list, immutable_list)):
-                return variables.ListVariable(
+                return variables.baselist(
                     unpacked, mutable_local=MutableLocal(), **options
                 )
             else:

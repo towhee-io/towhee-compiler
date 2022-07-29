@@ -405,7 +405,7 @@ class BuiltinVariable(VariableTracker):
                 list(obj.unpack_var_sequence(tx)),
                 mutable_local=MutableLocal(),
                 guards=guards,
-            ).add_options(self, obj)
+            ).trace(self, obj)
 
     call_iter = _call_iter_tuple_list
     call_tuple = _call_iter_tuple_list
@@ -415,10 +415,10 @@ class BuiltinVariable(VariableTracker):
         options = VariableTracker.propagate(self, args)
         if all(x.has_unpack_var_sequence(tx) for x in args):
             items = [
-                variables.TupleVariable(list(item), **options)
+                variables.basetuple(list(item), **options)
                 for item in zip(*[arg.unpack_var_sequence(tx) for arg in args])
             ]
-            return variables.TupleVariable(items, **options)
+            return variables.basetuple(items, **options)
 
     def call_enumerate(self, tx, *args):
         options = VariableTracker.propagate(self, args)
@@ -430,13 +430,13 @@ class BuiltinVariable(VariableTracker):
             start = args[1].as_python_constant()
         if args[0].has_unpack_var_sequence(tx):
             items = [
-                variables.TupleVariable(
-                    [variables.ConstantVariable(idx, **options), var],
+                variables.basetuple(
+                    [variables.constant(idx, **options), var],
                     **options,
                 )
                 for idx, var in enumerate(args[0].unpack_var_sequence(tx), start)
             ]
-            return variables.TupleVariable(items, **options)
+            return variables.basetuple(items, **options)
 
     def call_mul(self, tx, a, b):
         if isinstance(
@@ -444,13 +444,13 @@ class BuiltinVariable(VariableTracker):
         ) and isinstance(b, variables.ConstantVariable):
             return a.__class__(
                 items=a.items * b.as_python_constant(), mutable_local=MutableLocal()
-            ).add_options(self, a, b)
+            ).trace(self, a, b)
         elif isinstance(
             b, (variables.ListVariable, variables.TupleVariable)
         ) and isinstance(a, variables.ConstantVariable):
             return b.__class__(
                 items=b.items * a.as_python_constant(), mutable_local=MutableLocal()
-            ).add_options(self, a, b)
+            ).trace(self, a, b)
         else:
             return a.call_method(tx, "__mul__", [b], {})
 
@@ -514,7 +514,7 @@ class BuiltinVariable(VariableTracker):
     def call_map(self, tx, fn, seq):
         if seq.has_unpack_var_sequence(tx):
             items = [fn.call_function(tx, [x], {}) for x in seq.unpack_var_sequence(tx)]
-            return variables.TupleVariable(items).add_options(self, fn, seq)
+            return variables.basetuple(items).add_options(self, fn, seq)
 
     def call_sum(self, tx, seq, **kwargs):
         # Special case for sum on tuple of floats and ints
@@ -541,8 +541,8 @@ class BuiltinVariable(VariableTracker):
                 tx,
                 [
                     BuiltinVariable(operator.add),
-                    variables.TupleVariable(items),
-                    variables.ConstantVariable(0).add_options(self, seq),
+                    variables.basetuple(items),
+                    variables.constant(0).add_options(self, seq),
                 ],
                 {},
             )
@@ -681,18 +681,14 @@ class BuiltinVariable(VariableTracker):
     def call_reversed(self, tx, obj: VariableTracker):
         if obj.has_unpack_var_sequence(tx):
             items = list(reversed(obj.unpack_var_sequence(tx)))
-            return variables.TupleVariable(
-                items, **VariableTracker.propagate(self, obj)
-            )
+            return variables.basetuple(items, **variables.propagate(self, obj))
 
     def call_chain(self, tx, *args):
         if all(obj.has_unpack_var_sequence(tx) for obj in args):
             items = []
             for obj in args:
                 items.extend(obj.unpack_var_sequence(tx))
-            return variables.TupleVariable(
-                items, **VariableTracker.propagate(self, *args)
-            )
+            return variables.basetuple(items, **variables.propagate(self, *args))
 
     def call_islice(self, tx, iterable, *args):
         if iterable.has_unpack_var_sequence(tx) and all(
@@ -701,14 +697,14 @@ class BuiltinVariable(VariableTracker):
             const_args = [x.as_python_constant() for x in args]
             items = iterable.unpack_var_sequence(tx)
             items = list(itertools.islice(items, *const_args))
-            return variables.TupleVariable(
-                items, **VariableTracker.propagate(self, iterable, *args)
+            return variables.basetuple(
+                items, **variables.propagate(self, iterable, *args)
             )
 
     def call_id(self, tx, *args):
         if len(args) > 0 and isinstance(args[0], variables.NNModuleVariable):
             nn_mod_variable = args[0]
             mod = tx.output.get_submodule(nn_mod_variable.module_key)
-            return variables.ConstantVariable(id(mod))
+            return variables.constant(id(mod))
         else:
             unimplemented(f"call_id with args {args}")
