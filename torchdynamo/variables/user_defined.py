@@ -40,9 +40,9 @@ class UserDefinedClassVariable(UserDefinedVariable):
             obj = None
 
         if isinstance(obj, staticmethod):
-            return variables.UserFunctionVariable(obj.__get__(self.value), **options)
+            return variables.userfunc(obj.__get__(self.value), **options)
         elif isinstance(obj, classmethod):
-            return variables.UserMethodVariable(obj.__func__, self, **options)
+            return variables.usermethod(obj.__func__, self, **options)
 
         return super(UserDefinedClassVariable, self).var_getattr(tx, name)
 
@@ -210,7 +210,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             # check for methods implemented in C++
             if isinstance(method, types.FunctionType):
                 # TODO(jansel): add a guard to check for monkey patching?
-                return UserMethodVariable(method, self, **options).call_function(
+                return variables.usermethod(method, self, **options).call_function(
                     tx, args, kwargs
                 )
 
@@ -291,14 +291,14 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             subobj = self._getattr_static(name)
         except AttributeError:
             if isinstance(getattr_fn, types.FunctionType):
-                return variables.UserMethodVariable(
+                return variables.usermethod(
                     getattr_fn, self, **options
                 ).call_function(tx, [ConstantVariable(name)], {})
             elif getattr_fn is not None:
                 unimplemented("UserDefined with non-function __getattr__")
 
         if isinstance(subobj, property):
-            return variables.UserMethodVariable(
+            return variables.usermethod(
                 subobj.fget, self, **options
             ).call_function(tx, [], {})
 

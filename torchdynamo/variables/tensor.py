@@ -318,33 +318,30 @@ class TensorVariable(VariableTracker):
         return props
 
     def var_getattr(self, tx, name):
-        from . import ConstantVariable
-        from . import TorchVariable
-
         result = None
         options = VariableTracker.propagate(self)
         if name == "ndim" and self.ndim is not None:
-            result = ConstantVariable(self.ndim, **options)
+            result = variables.constant(self.ndim, **options)
         elif name == "dtype" and self.dtype is not None:
-            result = TorchVariable(self.dtype, **options)
+            result = variables.torch(self.dtype, **options)
         elif name == "device" and self.device is not None:
-            result = TorchVariable(self.device, **options)
+            result = variables.torch(self.device, **options)
         elif name == "is_cuda" and self.device is not None:
-            result = ConstantVariable(self.device.type == "cuda", **options)
+            result = variables.constant(self.device.type == "cuda", **options)
         elif name == "shape" and self.size is not None:
-            sizes = [variables.ConstantVariable(x) for x in self.size]
+            sizes = [variables.constant(x) for x in self.size]
             result = ShapeVariable(sizes, **options)
         elif name == "requires_grad" and self.requires_grad is not None:
-            result = ConstantVariable(self.requires_grad, **options)
+            result = variables.constant(self.requires_grad, **options)
         elif name == "is_quantized" and self.is_quantized is not None:
-            result = ConstantVariable(self.is_quantized, **options)
+            result = variables.constant(self.is_quantized, **options)
         elif name == "shape" and self.size is None:
             result = self.call_method(tx, "size", [], {})
         elif name == "ndim" and self.ndim is None:
             result = self.call_method(tx, "dim", [], {})
 
         if name == "__class__":
-            return TorchVariable(self.python_type(), **options)
+            return variables.torch(self.python_type(), **options)
 
         # Add a guard for type matching, these guards are checked before tensor guards
         # In some cases, a <tensor>.<attr> guard can be evaluated first, and break if

@@ -123,19 +123,19 @@ class NNModuleVariable(VariableTracker):
             return VariableBuilder(tx, NNModuleSource(source))(subobj)
         else:
             if istype(subobj, property):
-                return variables.UserFunctionVariable(
-                    subobj.fget, guards=guards
-                ).call_function(tx, [(self)], {})
+                return variables.userfunc(subobj.fget, guards=guards).call_function(
+                    tx, [(self)], {}
+                )
             elif istype(subobj, classmethod):
-                return variables.UserMethodVariable(
+                return variables.usermethod(
                     subobj.__func__,
                     variables.UserDefinedObjectVariable(type(base), guards=guards),
                     **options,
                 )
             elif istype(subobj, staticmethod):
-                return variables.UserFunctionVariable(subobj.__get__(base), **options)
+                return variables.userfunc(subobj.__get__(base), **options)
             elif istype(subobj, types.FunctionType):
-                return variables.UserMethodVariable(subobj, self, **options)
+                return variables.usermethod(subobj, self, **options)
             else:
                 unimplemented(f"class property {typestr(base)} {typestr(subobj)}")
 
@@ -194,7 +194,7 @@ class NNModuleVariable(VariableTracker):
                 fn = mod.__class__.forward
 
             return tx.inline_user_function_return(
-                variables.UserFunctionVariable(fn, **options),
+                variables.userfunc(fn, **options),
                 [self] + args,
                 kwargs,
             )
@@ -207,9 +207,6 @@ class NNModuleVariable(VariableTracker):
         args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> VariableTracker:
-        from . import ListIteratorVariable
-        from . import TupleVariable
-
         options = variables.propagate(self, args, kwargs.values())
         key = self.module_key
         module = tx.output.get_submodule(key)
@@ -252,10 +249,10 @@ class NNModuleVariable(VariableTracker):
                         **options,
                     )
                 )
-            return ListIteratorVariable(result, mutable_local=MutableLocal(), **options)
+            return variables.listiter(result, mutable_local=MutableLocal(), **options)
 
         def named_embed(name, obj):
-            return TupleVariable(
+            return variables.basetuple(
                 [
                     variables.constant(name, **options),
                     tx.output.add_submodule(
@@ -277,14 +274,14 @@ class NNModuleVariable(VariableTracker):
                 **get_kwargs("prefix", "recurse")
             ):
                 result.append(named_embed(name, param))
-            return ListIteratorVariable(result, mutable_local=MutableLocal(), **options)
+            return variables.listiter(result, mutable_local=MutableLocal(), **options)
         elif name == "named_modules":
             result = []
             for name, submod in module.named_modules(
                 **get_kwargs("memo", "prefix", "remove_duplicate")
             ):
                 result.append(named_embed(name, submod))
-            return ListIteratorVariable(result, mutable_local=MutableLocal(), **options)
+            return variables.listiter(result, mutable_local=MutableLocal(), **options)
         elif name == "parameters":
             return wrap_values(module.named_parameters(**get_kwargs("recurse")))
         elif name == "values":
@@ -295,7 +292,7 @@ class NNModuleVariable(VariableTracker):
             result = []
             for name, submod in module.items():
                 result.append(named_embed(name, submod))
-            return ListIteratorVariable(result, mutable_local=MutableLocal(), **options)
+            return variables.listiter(result, mutable_local=MutableLocal(), **options)
         elif name == "__len__":
             assert not (args or kwargs)
             return variables.constant(len(module), **options)
@@ -334,7 +331,7 @@ class NNModuleVariable(VariableTracker):
                             **options,
                         )
                     )
-                return TupleVariable(result, **options)
+                return variables.basetuple(result, **options)
 
             key = args[0].as_python_constant()
             submod = module[key]
@@ -417,7 +414,7 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
         else:
             fn = self.value_type.forward
 
-        return variables.UserFunctionVariable(fn, **options).call_function(
+        return variables.userfunc(fn, **options).call_function(
             tx, [self] + list(args), kwargs
         )
 
@@ -451,7 +448,7 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
                             options
                         )
                     )
-                return variables.ListIteratorVariable(
+                return variables.listiter(
                     items, mutable_local=MutableLocal(), **options
                 )
 
