@@ -151,7 +151,8 @@ def run_one_model(
 BLACKLIST = [
     "attention_is_all_you_need_pytorch",
     "detectron2_maskrcnn",
-    "fambench_xlmr"
+    "fambench_xlmr",
+    "maml"
 ]
 
 
