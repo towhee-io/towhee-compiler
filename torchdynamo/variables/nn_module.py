@@ -5,8 +5,10 @@ import re
 import types
 from typing import Dict
 from typing import List
+from typing import Sequence
 
 import torch.nn
+from typeguard import typechecked
 
 from torchdynamo.variables.lists import SliceVariable
 
@@ -42,9 +44,6 @@ class NNModuleVariable(VariableTracker):
     def python_type(self):
         return self.module_type
 
-    def _wrap_submodule(self, tx, source, submod, *key_extra, **options):
-        return
-
     def unpack_var_sequence(self, tx):
         # implement list/iter/tuple/etc calls
         base = tx.output.get_submodule(self.module_key)
@@ -53,18 +52,16 @@ class NNModuleVariable(VariableTracker):
             base, (torch.nn.ModuleList, torch.nn.ParameterList, torch.nn.Sequential)
         ), typestr(base)
         assert self.source
-        result = []
-        for idx, submod in enumerate(base):
-            result.append(
-                tx.output.add_submodule(
-                    submod,
-                    self.module_key,
-                    idx,
-                    source=NNModuleSource(GetItemSource(self.source, idx)),
-                    **options,
-                )
+        return [
+            tx.output.add_submodule(
+                submod,
+                self.module_key,
+                idx,
+                source=NNModuleSource(GetItemSource(self.source, idx)),
+                **options,
             )
-        return result
+            for idx, submod in enumerate(base)
+        ]
 
     def call_hasattr(self, tx, name: str) -> "VariableTracker":
         options = VariableTracker.propagate(self)
@@ -203,12 +200,13 @@ class NNModuleVariable(VariableTracker):
                 kwargs,
             )
 
+    @typechecked
     def call_method(
         self,
         tx,
         name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
     ) -> "VariableTracker":
         from . import ConstantVariable
         from . import ListIteratorVariable
@@ -349,6 +347,12 @@ class NNModuleVariable(VariableTracker):
                 source=NNModuleSource(GetItemSource(self.source, key)),
                 **options,
             )
+        elif name == "_get_abs_string_index":
+            assert not kwargs and len(args) == 1
+            assert type(module) is torch.nn.ModuleList
+            assert self.source
+
+            return ConstantVariable(module._get_abs_string_index(args[0].as_python_constant()), **options)
         else:
             return super().call_method(tx, name, args, kwargs)
 

@@ -151,7 +151,15 @@ def run_one_model(
 BLACKLIST = [
     "attention_is_all_you_need_pytorch",
     "detectron2_maskrcnn",
-    "fambench_xlmr"
+    "fambench_xlmr",
+    "maml",
+    "mobilenet_v2_quantized_qat",
+    "moco",
+    "pytorch_stargan",
+    "resnet50_quantized_qat",
+    "tacotron2",
+    "timm_efficientdet",
+    "vision_maskrcnn"
 ]
 
 
@@ -166,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--repeat", type=int, default=1)
     parser.add_argument("-R", "--round", type=int, default=1)
     parser.add_argument("-Q", "--perf_loss_ths", type=float, default=None)
+    parser.add_argument("-S", "--skip", type=str, default=None)
     args = parser.parse_args()
 
     original_dir = os.path.abspath(os.getcwd())
@@ -189,9 +198,12 @@ if __name__ == "__main__":
         ]
 
     model_list = copy.deepcopy(args.model_name)
+    model_list.sort()
     logger.info(f"trying model list: {model_list}")
     for model_name in model_list:
         if model_name in BLACKLIST:
+            continue
+        if args.skip is not None and model_name < args.skip:
             continue
         logger.info(f"trying model: {model_name}")
         args.model_name = model_name
