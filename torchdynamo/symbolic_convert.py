@@ -286,6 +286,7 @@ class InstructionTranslatorBase(object):
         except Unsupported as exc:
             exc.real_stack.append(self.frame_summary())
             print(f"Unsupported Instruction: {inst}")
+            # traceback.print_exception(Unsupported, exc)
             if self.empty_checkpoint():
                 raise
 
