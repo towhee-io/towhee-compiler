@@ -3,7 +3,8 @@ class PassManager:
         self._passes = []
 
     def add(self, p):
-        return self._passes.append(p)
+        self._passes.append(p)
+        return self
 
     def execute(self, ir):
         for p in self._passes:
