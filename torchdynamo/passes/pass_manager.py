@@ -7,6 +7,11 @@ class PassManager:
         return self
 
     def execute(self, ir):
-        for p in self._passes:
-            ir = p(ir)
-        return ir
+        try:
+            retval = ir
+            for i in range(len(self._passes)):
+                retval = self._passes[i](retval)
+        except:
+            import traceback
+            traceback.print_exc()
+        return retval
