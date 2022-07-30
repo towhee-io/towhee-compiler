@@ -1,4 +1,4 @@
-def remove_pointless_jump(instructions):
+def remove_pointless_jumps(instructions):
     """Eliminate jumps to the next instruction"""
     pointless_jumps = {
         id(a)
