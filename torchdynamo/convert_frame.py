@@ -10,10 +10,10 @@ from typing import Callable
 import torch
 from torch.fx.graph_module import _forward_from_src as original_forward_from_src
 
+from torchdynamo import passes
+
 from . import config
 from .allowed_functions import is_allowed
-from .bytecode_analysis import remove_dead_code
-from .bytecode_analysis import remove_pointless_jumps
 from .bytecode_transformation import is_generator
 from .bytecode_transformation import transform_code_object
 from .eval_frame import TorchPatcher
@@ -253,8 +253,7 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
             instructions[:] = output.output_instructions
             code_options.update(output.code_options)
 
-            if config.dead_code_elimination:
-                instructions[:] = remove_pointless_jumps(remove_dead_code(instructions))
+            instructions[:] = passes.bytecode.common().execute(instructions)
 
         def debug_print(prefix):
             if not config.debug:
