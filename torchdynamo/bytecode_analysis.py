@@ -29,36 +29,6 @@ else:
     stack_effect = dis.stack_effect
 
 
-def remove_dead_code(instructions):
-    """Dead code elimination"""
-    indexof = {id(inst): i for i, inst in enumerate(instructions)}
-    live_code = set()
-
-    def find_live_code(start):
-        for i in range(start, len(instructions)):
-            if i in live_code:
-                return
-            live_code.add(i)
-            inst = instructions[i]
-            if inst.opcode in JUMP_OPCODES:
-                find_live_code(indexof[id(inst.target)])
-            if inst.opcode in TERMINAL_OPCODES:
-                return
-
-    find_live_code(0)
-    return [inst for i, inst in enumerate(instructions) if i in live_code]
-
-
-def remove_pointless_jumps(instructions):
-    """Eliminate jumps to the next instruction"""
-    pointless_jumps = {
-        id(a)
-        for a, b in zip(instructions, instructions[1:])
-        if a.opname == "JUMP_ABSOLUTE" and a.target is b
-    }
-    return [inst for inst in instructions if id(inst) not in pointless_jumps]
-
-
 @dataclasses.dataclass
 class ReadsWrites:
     reads: set
