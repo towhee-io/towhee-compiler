@@ -5,18 +5,18 @@ from setuptools import setup
 from torch.utils.cpp_extension import CppExtension
 
 long_description = """
-TorchDynamo is a Python-level JIT compiler designed to make unmodified
-PyTorch programs faster. TorchDynamo hooks into the frame evaluation API
-in CPython (PEP 523) to dynamically modify Python bytecode right before
-it is executed. It rewrites Python bytecode in order to extract sequences
-of PyTorch operations into an FX Graph which is then just-in-time
-compiled with an ensemble of different backends and autotuning.
+Towhee compiler is a Python JIT compiler that
+speeds up AI-related codes by native code generation.
+The project is inspired by [Numba](https://github.com/numba/numba),
+[Pyjion](https://www.trypyjion.com) and [TorchDynamo]().
+Towhee compiler uses a frame evaluation hook (see [PEP 523]: https://www.python.org/dev/peps/pep-0523/)
+to get the chance of compiling python bytecodes into native code.
 """
 
 setup(
-    name="torchdynamo",
-    version="1.13.0.dev0",
-    url="https://github.com/pytorch/torchdynamo",
+    name="towhee.compiler",
+    version="0.1.0",
+    url="https://github.com/towhee-io/towhee-compiler",
     description="A Python-level JIT compiler designed to make unmodified PyTorch programs faster.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -25,23 +25,21 @@ setup(
     license="BSD-3",
     keywords="pytorch machine learning compilers",
     python_requires=">=3.7, <3.11",
-    install_requires=["torch>=1.12.0", "numpy", "tabulate", "sympy"],
+    install_requires=["torch", "numpy", "tabulate"],
     packages=find_packages(
         include=[
             "towhee",
             "towhee.compiler",
             "torchdynamo",
             "torchdynamo.*",
-            "torchinductor",
-            "torchinductor.*",
         ]
     ),
-    namespace_package = ['towhee'],
+    namespace_package=["towhee"],
     zip_safe=False,
     ext_modules=[
         Extension(
-            "torchdynamo._eval_frame",
-            ["torchdynamo/_eval_frame.c"],
+            "towhee.compiler.jit._eval_frame",
+            ["towhee/compiler/jit/_eval_frame.c"],
             extra_compile_args=["-Wall"],
         ),
         CppExtension(

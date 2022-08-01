@@ -1,3 +1,5 @@
+// This file is based on torchdynamo project, see https://github.com/pytorch/torchdynamo/blob/main/torchdynamo/_eval_frame.c
+
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <frameobject.h>
@@ -10,9 +12,6 @@
 #undef Py_BUILD_CORE
 #endif
 
-#define bool char
-#define false 0
-#define true 1
 #define unlikely(x) __builtin_expect((x), 0)
 
 #define NULL_CHECK(val)                                                        \
@@ -377,20 +376,20 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate, PyFrameObject *frame,
   }
 }
 
-static int active_dynamo_threads = 0;
+static int active_jit_threads = 0;
 
 static PyObject *increment_working_threads(PyThreadState *tstate) {
-  active_dynamo_threads = active_dynamo_threads + 1;
-  if (active_dynamo_threads > 0) {
+  active_jit_threads = active_jit_threads + 1;
+  if (active_jit_threads > 0) {
     enable_eval_frame_shim(tstate);
   }
   Py_RETURN_NONE;
 }
 
 static PyObject *decrement_working_threads(PyThreadState *tstate) {
-  if (active_dynamo_threads > 0) {
-    active_dynamo_threads = active_dynamo_threads - 1;
-    if (active_dynamo_threads == 0) {
+  if (active_jit_threads > 0) {
+    active_jit_threads = active_jit_threads - 1;
+    if (active_jit_threads == 0) {
       enable_eval_frame_default(tstate);
     }
   }
