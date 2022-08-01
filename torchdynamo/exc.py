@@ -1,4 +1,3 @@
-import dataclasses
 import os
 import traceback
 
@@ -21,9 +20,8 @@ class TorchRuntimeError(RuntimeError):
     pass
 
 
-@dataclasses.dataclass
 class FakeTensorError(RuntimeError):
-    reason: str
+    pass
 
 
 class BackendCompilerFailed(RuntimeError):
