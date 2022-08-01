@@ -5,6 +5,7 @@ import threading
 import warnings
 
 import torch
+from towhee.compiler.types import nothing
 
 from torchdynamo.utils import checkpoint_params
 from torchdynamo.utils import clone_inputs
@@ -17,7 +18,7 @@ from .mutation_guard import install_generation_tagging_init
 from .utils import same
 
 try:
-    from . import _eval_frame
+    from towhee.compiler.jit import _eval_frame
 except (ModuleNotFoundError, ImportError) as e:
     raise RuntimeError("run `python setup.py develop` to compile C extensions") from e
 
@@ -34,10 +35,6 @@ set_guard_fail_hook = _eval_frame.set_guard_fail_hook
 set_guard_error_hook = _eval_frame.set_guard_error_hook
 
 always_optimize_code_objects = utils.ExactWeakKeyDictionary()
-
-
-def nothing():
-    pass
 
 
 null_context = contextlib.nullcontext
