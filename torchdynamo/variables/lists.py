@@ -1,7 +1,8 @@
-from typing import Dict
+from typing import Dict, Sequence
 from typing import List
 
 import torch
+from typeguard import typechecked
 
 from .. import variables
 from ..bytecode_transformation import create_instruction
@@ -34,7 +35,10 @@ class BaseListVariable(VariableTracker):
         return [x.as_proxy() for x in self.items]
 
     def as_python_constant(self):
-        if isinstance(self._as_python_constant_, str) and self._as_python_constant_ == "self":
+        if (
+            isinstance(self._as_python_constant_, str)
+            and self._as_python_constant_ == "self"
+        ):
             return super().as_python_constant()
         return self.python_type()([x.as_python_constant() for x in self.items])
 
@@ -49,32 +53,32 @@ class BaseListVariable(VariableTracker):
                     items=self.items[index],
                     source=GetItemSource(self.source, index),
                     mutable_local=None,
-                ).add_options(arg, self)
+                ).trace(arg, self)
             else:
-                return self.clone(
-                    items=self.items[index], mutable_local=None
-                ).add_options(arg, self)
+                return self.clone(items=self.items[index], mutable_local=None).trace(
+                    arg, self
+                )
         else:
             assert isinstance(index, int)
-            return self.items[index].add_options(arg, self)
+            return self.items[index].trace(arg, self)
 
     def unpack_var_sequence(self, tx):
-        return [x.add_options(self) for x in self.items]
+        return [x.trace(self) for x in self.items]
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         if name == "__getitem__":
             assert not kwargs and len(args) == 1
             return self.getitem_const(args[0])
         elif name == "__add__":
             assert not kwargs and len(args) == 1
-            return type(self)(self.items + args[0].items, **options)
+            return type(self)(self.items + args[0].items).trace(self, args, kwargs)
         elif (
             name == "__contains__"
             and len(args) == 1
@@ -84,7 +88,7 @@ class BaseListVariable(VariableTracker):
             assert not kwargs
             search = args[0].as_python_constant()
             result = any(x.as_python_constant() == search for x in self.items)
-            return variables.ConstantVariable(result, **options)
+            return variables.constant(result).trace(self, args, kwargs)
 
         return super(BaseListVariable, self).call_method(tx, name, args, kwargs)
 
@@ -95,7 +99,7 @@ class RangeVariable(BaseListVariable):
 
     def __init__(self, value, items=None, guards=None, **kwargs):
         if items is None:
-            items = [variables.ConstantVariable(x, guards=guards) for x in value]
+            items = [variables.constant(x, guards=guards) for x in value]
         super().__init__(items, guards=guards, **kwargs)
         self.value = value
 
@@ -131,22 +135,23 @@ class ListVariable(BaseListVariable):
         codegen.foreach(self.items)
         return [create_instruction("BUILD_LIST", len(self.items))]
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
+        options = variables.propagate(self, args, kwargs.values())
         if name == "append" and self.mutable_local:
             assert not kwargs
-            (arg,) = args
+            assert len(args) == 1
             tx.replace_all(
                 self,
-                ListVariable(self.items + [arg], **options),
+                ListVariable(self.items + args, **options),
             )
-            return ConstantVariable(None)
+            return variables.constant(None)
         elif (
             name in ("extend", "__iadd__")
             and self.mutable_local
@@ -154,11 +159,11 @@ class ListVariable(BaseListVariable):
             and args[0].has_unpack_var_sequence(tx)
         ):
             assert not kwargs
-            (arg,) = args
+            assert len(args) == 1
             return tx.replace_all(
                 self,
                 ListVariable(
-                    list(self.items) + list(arg.unpack_var_sequence(tx)),
+                    list(self.items) + list(args[0].unpack_var_sequence(tx)),
                     **options,
                 ),
             )
@@ -209,35 +214,36 @@ class TupleVariable(BaseListVariable):
         codegen.foreach(self.items)
         return [create_instruction("BUILD_TUPLE", len(self.items))]
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         if (
             name in ("__add__", "__iadd__")
             and len(args) == 1
             and isinstance(args[0], TupleVariable)
         ):
             assert not kwargs
-            return TupleVariable(self.items + args[0].items, **options)
+            return TupleVariable(self.items + args[0].items).trace(self, args, kwargs)
         elif (
             name in ("__add__", "__iadd__")
             and len(args) == 1
-            and isinstance(args[0], variables.ConstantVariable)
+            and isinstance(args[0], ConstantVariable)
         ):
             assert not kwargs
             return TupleVariable(
-                self.items + list(args[0].unpack_var_sequence(self)), **options
-            )
+                self.items + list(args[0].unpack_var_sequence(self))
+            ).trace(self, args, kwargs)
         return super().call_method(tx, name, args, kwargs)
 
 
 class SizeVariable(TupleVariable):
     """torch.Size(...)"""
+
     _python_type_ = torch.Size
 
     def reconstruct(self, codegen):
@@ -280,19 +286,19 @@ class NamedTupleVariable(TupleVariable):
         fields = namedtuple_fields(self.tuple_cls)
         if name not in fields:
             unimplemented(f"NamedTupleVariable.{name}")
-        return self.items[fields.index(name)].add_options(self)
+        return self.items[fields.index(name)].trace(self)
 
-    def call_hasattr(self, tx, name: str) -> "VariableTracker":
-        options = VariableTracker.propagate(self)
+    def call_hasattr(self, tx, name: str) -> VariableTracker:
+        options = variables.propagate(self)
         fields = namedtuple_fields(self.tuple_cls)
-        return variables.ConstantVariable(name in fields, **options)
+        return variables.constant(name in fields, **options)
 
 
 class SliceVariable(BaseListVariable):
     _python_type_ = slice
 
     def __init__(self, items, **kwargs):
-        start, stop, step = [variables.ConstantVariable(None)] * 3
+        start, stop, step = [variables.constant(None)] * 3
         if len(items) == 1:
             (stop,) = items
         elif len(items) == 2:
@@ -317,7 +323,7 @@ class SliceVariable(BaseListVariable):
         fields = ["start", "stop", "step"]
         if name not in fields:
             unimplemented(f"slice.{name}")
-        return self.items[fields.index(name)].add_options(self)
+        return self.items[fields.index(name)].trace(self)
 
 
 class ListIteratorVariable(VariableTracker):
@@ -332,7 +338,7 @@ class ListIteratorVariable(VariableTracker):
         assert self.mutable_local
         if self.index >= len(self.items):
             raise StopIteration()
-        return self.items[self.index].add_options(self), ListIteratorVariable(
+        return self.items[self.index].trace(self), ListIteratorVariable(
             self.items,
             self.index + 1,
             mutable_local=MutableLocal(),
@@ -345,7 +351,7 @@ class ListIteratorVariable(VariableTracker):
         return iter([x.as_python_constant() for x in self.items])
 
     def unpack_var_sequence(self, tx):
-        return [x.add_options(self) for x in self.items[self.index :]]
+        return [x.trace(self) for x in self.items[self.index :]]
 
     def reconstruct(self, codegen):
         remaining_items = self.items[self.index :]

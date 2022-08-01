@@ -2,10 +2,8 @@ from typing import Dict
 from typing import List
 
 from .. import variables
-from ..exc import unimplemented
 from ..utils import istype
 from .base import VariableTracker
-from .base import typestr
 
 
 class ConstantVariable(VariableTracker):
@@ -22,10 +20,8 @@ class ConstantVariable(VariableTracker):
         return self.unpack_var_sequence(tx=None)
 
     def getitem_const(self, arg: VariableTracker):
-        return ConstantVariable(
-            self.value[arg.as_python_constant()],
-            **VariableTracker.propagate([self, arg]),
-        )
+        index = arg.as_python_constant()
+        return ConstantVariable(self.value[index]).trace(self, arg)
 
     @staticmethod
     def is_literal(obj):
@@ -37,7 +33,7 @@ class ConstantVariable(VariableTracker):
 
     def unpack_var_sequence(self, tx):
         try:
-            options = VariableTracker.propagate([self])
+            options = variables.propagate([self])
             return [ConstantVariable(x, **options) for x in self.as_python_constant()]
         except TypeError:
             raise NotImplementedError()
@@ -51,37 +47,28 @@ class ConstantVariable(VariableTracker):
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
+        name: str,
+        args: List[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
     ) -> "VariableTracker":
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        options = variables.propagate(self, args, kwargs.values())
 
         if istype(self.value, tuple):
             # empty tuple constant etc
-            return variables.TupleVariable(
-                items=self.unpack_var_sequence(tx), source=self.source, **options
+            return variables.basetuple(
+                self.unpack_var_sequence(tx), source=self.source, **options
             ).call_method(tx, name, args, kwargs)
 
-        try:
-            const_args = [a.as_python_constant() for a in args]
-            const_kwargs = {k: v.as_python_constant() for k, v in kwargs.items()}
-        except NotImplementedError:
-            return super(ConstantVariable, self).call_method(tx, name, args, kwargs)
-
         if isinstance(self.value, str) and name in str.__dict__.keys():
-            assert not kwargs
-            method = getattr(self.value, name)
-            return ConstantVariable(method(*const_args, **const_kwargs), **options)
-        elif name == "__len__" and not (args or kwargs):
-            return ConstantVariable(len(self.value), **options)
-        elif name == "__contains__" and len(args) == 1 and args[0].is_python_constant():
-            assert not kwargs
-            search = args[0].as_python_constant()
-            result = search in self.value
-            return ConstantVariable(result, **options)
+            try:
+                const_args = [a.as_python_constant() for a in args]
+                const_kwargs = {k: v.as_python_constant() for k, v in kwargs.items()}
 
-        unimplemented(f"const method call {typestr(self.value)}.{name}")
+                method = getattr(self.value, name)
+                return ConstantVariable(method(*const_args, **const_kwargs), **options)
+            except NotImplementedError:
+                pass
+        return super(ConstantVariable, self).call_method(tx, name, args, kwargs)
 
 
 class EnumVariable(VariableTracker):

@@ -1,10 +1,11 @@
 import inspect
 import sys
 import types
-from typing import Dict
+from typing import Dict, Sequence
 from typing import List
 
 import torch._C
+from typeguard import typechecked
 
 from .. import variables
 from ..bytecode_transformation import create_instruction
@@ -50,25 +51,26 @@ class SuperVariable(VariableTracker):
         # TODO(jansel): there is a small chance this could trigger user code, prevent that
         return getattr(super(search_type, type_to_use), name)
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        options = VariableTracker.propagate(
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
+        options = variables.propagate(
             self, args, kwargs.values(), self.objvar, self.typevar
         )
         inner_fn = self.const_getattr(self, name)
         if inner_fn is object.__init__:
             return LambdaVariable(identity, **options)
         elif isinstance(inner_fn, types.FunctionType):
-            return variables.UserFunctionVariable(inner_fn, **options).call_function(
+            return variables.userfunc(inner_fn, **options).call_function(
                 tx, [self.objvar] + args, kwargs
             )
         elif isinstance(inner_fn, types.MethodType):
-            return variables.UserMethodVariable(
+            return variables.usermethod(
                 inner_fn.__func__, self.objvar, **options
             ).call_function(tx, args, kwargs)
         else:
@@ -117,11 +119,11 @@ class ContextWrappingVariable(ContextManagerVariable):
 
     def enter(self, tx):
         self._call_func(tx, self.target_value)
-        return variables.ConstantVariable(None, **VariableTracker.propagate(self))
+        return variables.constant(None, **variables.propagate(self))
 
     def exit(self, tx, *args):
         self._call_func(tx, self.initial_value)
-        return variables.ConstantVariable(None, **VariableTracker.propagate(self))
+        return variables.constant(None, **variables.propagate(self))
 
     def reconstruct(self, codegen, target_inst=None):
         """
@@ -315,9 +317,10 @@ class WithExitFunctionVariable(VariableTracker):
         self.ctx = ctx
         self.target = target
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         assert not kwargs
         return self.ctx.exit(tx, *args)
 
@@ -382,25 +385,24 @@ class AutogradFunctionVariable(VariableTracker):
 
         args = [BlackHoleVariable()] + list(args)
         options = VariableTracker.propagate(self, args, kwargs.values())
-        return variables.UserFunctionVariable(
-            self.fn_cls.forward, **options
-        ).call_function(tx, args, kwargs)
+        return variables.userfunc(self.fn_cls.forward, **options).call_function(
+            tx, args, kwargs
+        )
 
 
 class BlackHoleVariable(VariableTracker):
     """A autograd.function context that just ignores everything (for forward extraction)"""
 
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        name: str,
+        args: List[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         assert name in ("__setattr__", "save_for_backward"), name
-        return variables.ConstantVariable(
-            None, **VariableTracker.propagate(self, args, kwargs.values())
-        )
+        return variables.constant(None).trace(self, args, kwargs)
 
 
 class LambdaVariable(VariableTracker):
@@ -411,7 +413,7 @@ class LambdaVariable(VariableTracker):
     def call_function(
         self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
     ) -> "VariableTracker":
-        return self.fn(*args, **kwargs).add_options(self)
+        return self.fn(*args, **kwargs).trace(self)
 
 
 class GetAttrVariable(VariableTracker):
@@ -440,9 +442,10 @@ class GetAttrVariable(VariableTracker):
         codegen(self.obj)
         return codegen.create_load_attrs(self.name)
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
 
         # This variable is True when it corresponds to user code such as
         #
@@ -496,24 +499,24 @@ class GetAttrVariable(VariableTracker):
                     )
 
         if isinstance(self.obj, AutogradFunctionVariable) and self.name == "apply":
-            return self.obj.call_apply(tx, args, kwargs).add_options(self)
-        return self.obj.call_method(tx, self.name, args, kwargs).add_options(self)
+            return self.obj.call_apply(tx, args, kwargs).trace(self)
+        return self.obj.call_method(tx, self.name, args, kwargs).trace(self)
 
+    @typechecked
     def call_method(
         self,
         tx,
         name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         if (
             name == "__len__"
             and isinstance(self.obj, InspectSignatureVariable)
             and self.name == "parameters"
         ):
-            return variables.ConstantVariable(
-                self.obj.inspected.num_parameters(),
-                **VariableTracker.propagate(self, self.obj, self.obj.inspected),
+            return variables.constant(self.obj.inspected.num_parameters()).trace(
+                self, self.obj, self.obj.inspected
             )
         return super(GetAttrVariable, self).call_method(tx, name, args, kwargs)
 
@@ -526,9 +529,10 @@ class SkipFilesVariable(VariableTracker):
     _python_type_ = "self"
     _as_python_constant_ = "self"
 
+    @typechecked
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
-    ) -> "VariableTracker":
+        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
+    ) -> VariableTracker:
         if inspect.getattr_static(self.value, "_torchdynamo_disable", False):
             unimplemented("call torchdynamo.disable() wrapped function")
         else:
@@ -540,19 +544,18 @@ class SkipFilesVariable(VariableTracker):
 
 
 class TypingVariable(VariableTracker):
-
+    @typechecked
     def call_method(
         self,
         tx,
-        name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        name: str,
+        args: Sequence[VariableTracker],
+        kwargs: Dict[str, VariableTracker],
+    ) -> VariableTracker:
         if name == "__getitem__" and len(args) == 1:
-            return variables.ConstantVariable(
-                self.value[args[0].as_python_constant()],
-                **VariableTracker.propagate(self, args),
-            )
+            index = args[0].as_python_constant()
+            return variables.constant(self.value[index]).trace(self, args)
+
         unimplemented("typing")
 
 
@@ -560,4 +563,5 @@ class NumpyVariable(VariableTracker):
     """
     Wrapper around `numpy.*` for better error messages.
     """
+
     pass

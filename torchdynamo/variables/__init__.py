@@ -1,3 +1,4 @@
+from typing import Any, List
 from .base import VariableTracker
 from .builtin import BuiltinVariable
 from .constant import ConstantVariable
@@ -36,6 +37,45 @@ from .tensor import UnspecializedPythonVariable
 from .torch import TorchVariable
 from .user_defined import UserDefinedClassVariable
 from .user_defined import UserDefinedObjectVariable
+
+
+def is_literal(obj: Any) -> bool:
+    return ConstantVariable.is_literal(obj)
+
+
+def propagate(*vars: List[List[VariableTracker]]):
+    return VariableTracker.propagate(*vars)
+
+
+def constant(*args, **kwargs):
+    return ConstantVariable(*args, **kwargs)
+
+
+def baselist(*args, **kwargs):
+    return ListVariable(*args, **kwargs)
+
+
+def basetuple(*args, **kwargs):
+    return TupleVariable(*args, **kwargs)
+
+
+def listiter(*args, **kwargs):
+    return ListIteratorVariable(*args, **kwargs)
+
+
+def constdict(*args, **kwargs):
+    return ConstDictVariable(*args, **kwargs)
+
+
+def userfunc(*args, **kwargs):
+    return UserFunctionVariable(*args, **kwargs)
+
+def usermethod(*args, **kwargs):
+    return UserMethodVariable(*args, **kwargs)
+
+def torch(*args, **kwargs):
+    return TorchVariable(*args, **kwargs)
+
 
 __all__ = [
     "AutogradFunctionVariable",

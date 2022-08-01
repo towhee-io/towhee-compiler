@@ -31,6 +31,7 @@ from torchdynamo.variables.builder import VariableBuilder
 from . import config
 from . import exc
 from . import skipfiles
+from . import variables
 from .allowed_functions import is_allowed
 from .allowed_functions import is_builtin
 from .bytecode_analysis import livevars_analysis
@@ -285,6 +286,7 @@ class InstructionTranslatorBase(object):
         except Unsupported as exc:
             exc.real_stack.append(self.frame_summary())
             print(f"Unsupported Instruction: {inst}")
+            # traceback.print_exception(Unsupported, exc)
             if self.empty_checkpoint():
                 raise
 
@@ -626,7 +628,7 @@ class InstructionTranslatorBase(object):
     @break_graph_if_unsupported(push=1)
     def CALL_FUNCTION_EX(self, inst):
         if inst.argval == 0:
-            kwargsvars = ConstDictVariable({}, dict)
+            kwargsvars = variables.constdict({}, dict)
             argsvars = self.pop()
         elif inst.argval == 1:
             kwargsvars = self.pop()
@@ -763,7 +765,7 @@ class InstructionTranslatorBase(object):
             result[k.value] = v
         assert len(result) == len(items) / 2
         self.push(
-            ConstDictVariable(result, dict, mutable_local=MutableLocal(), **options)
+            variables.constdict(result, dict, mutable_local=MutableLocal(), **options)
         )
 
     def BUILD_CONST_KEY_MAP(self, inst):
@@ -775,7 +777,7 @@ class InstructionTranslatorBase(object):
         assert istype(keys, tuple)
         assert len(keys) == len(values)
         self.push(
-            ConstDictVariable(
+            variables.constdict(
                 dict(zip(keys, values)),
                 dict,
                 mutable_local=MutableLocal(),
@@ -797,7 +799,7 @@ class InstructionTranslatorBase(object):
         items[k.as_python_constant()] = v
         self.replace_all(
             obj,
-            ConstDictVariable(
+            variables.constdict(
                 items,
                 obj.user_cls,
                 **VariableTracker.propagate([obj, k, v]),
