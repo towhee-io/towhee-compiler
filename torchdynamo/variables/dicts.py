@@ -7,15 +7,15 @@ from typing import Sequence
 
 from typeguard import typechecked
 
-from .. import variables
+from .. import variables as var
 from ..bytecode_transformation import create_instruction
 from ..eval_frame import skip_code
 from ..exc import unimplemented
 from ..source import AttrSource
-from .base import VariableTracker
+from ..variables import Variable
 
 
-class ConstDictVariable(VariableTracker):
+class ConstDictVariable(Variable):
     def __init__(self, items, user_cls, **kwargs):
         super(ConstDictVariable, self).__init__(**kwargs)
         self.items = items
@@ -38,7 +38,7 @@ class ConstDictVariable(VariableTracker):
             create_instruction("BUILD_CONST_KEY_MAP", len(keys)),
         ]
 
-    def getitem_const(self, arg: VariableTracker):
+    def getitem_const(self, arg: Variable):
         index = arg.as_python_constant()
         return self.items[index].trace(self, arg)
 
@@ -47,10 +47,10 @@ class ConstDictVariable(VariableTracker):
         self,
         tx,
         name: str,
-        args: Sequence[VariableTracker],
-        kwargs: Dict[str, VariableTracker],
-    ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
+        args: Sequence[Variable],
+        kwargs: Dict[str, Variable],
+    ) -> Variable:
+        options = var.propagate(self, args, kwargs.values())
         val = self.items
 
         if name == "__getitem__":
@@ -58,28 +58,26 @@ class ConstDictVariable(VariableTracker):
             return self.getitem_const(args[0])
         elif name == "items":
             assert not (args or kwargs)
-            return variables.basetuple(
+            return var.basetuple(
                 [
-                    variables.basetuple(
-                        [variables.constant(k, **options), v], **options
-                    )
+                    var.basetuple([var.constant(k, **options), v], **options)
                     for k, v in val.items()
                 ],
                 **options,
             )
         elif name == "keys":
             assert not (args or kwargs)
-            return variables.basetuple(
-                [variables.constant(k, **options) for k in val.keys()],
+            return var.basetuple(
+                [var.constant(k, **options) for k in val.keys()],
                 **options,
             )
 
         elif name == "values":
             assert not (args or kwargs)
-            return variables.basetuple(list(val.values()), **options)
+            return var.basetuple(list(val.values()), **options)
         elif name == "__len__":
             assert not (args or kwargs)
-            return variables.constant(len(self.items), **options)
+            return var.constant(len(self.items), **options)
         elif (
             name == "__setitem__"
             and args
@@ -128,9 +126,7 @@ class ConstDictVariable(VariableTracker):
             result = self.items[args[0].as_python_constant()]
             return result.add_options(options)
         elif name == "__contains__" and args and args[0].is_python_constant():
-            return variables.constant(
-                args[0].as_python_constant() in self.items, **options
-            )
+            return var.constant(args[0].as_python_constant() in self.items, **options)
         else:
             return super().call_method(tx, name, args, kwargs)
 
@@ -139,8 +135,8 @@ class ConstDictVariable(VariableTracker):
         return self.clone(items=items, **options)
 
     def unpack_var_sequence(self, tx):
-        options = variables.propagate([self])
-        result = [variables.constant(k, **options) for k in self.items.keys()]
+        options = var.propagate([self])
+        result = [var.constant(k, **options) for k in self.items.keys()]
         return result
 
 
@@ -190,16 +186,16 @@ class DataClassVariable(ConstDictVariable):
         items = collections.OrderedDict()
         for key in keys:
             val = bound.arguments[key]
-            if isinstance(val, VariableTracker):
+            if isinstance(val, Variable):
                 items[key] = val
             else:
                 if cls.include_none:
-                    assert variables.is_literal(val)
-                    items[key] = variables.constant(val)
+                    assert var.is_literal(val)
+                    items[key] = var.constant(val)
                 else:
                     assert val is None, f"unexpected {val}"
 
-        if len(items) == 1 and not isinstance(items[keys[0]], variables.TensorVariable):
+        if len(items) == 1 and not isinstance(items[keys[0]], var.TensorVariable):
             unimplemented("DataClassVariable iterator constructor")
             # TODO(jansel): implement unpacking logic in ModelOutput.__post_init__
 
@@ -223,9 +219,7 @@ class DataClassVariable(ConstDictVariable):
                     items[key] = var
                 else:
                     excluded.append(var)
-        return cls(
-            items, user_cls, **VariableTracker.propagate(excluded, items.values())
-        )
+        return cls(items, user_cls, **var.propagate(excluded, items.values()))
 
     def __init__(self, items, user_cls, **options):
         super(DataClassVariable, self).__init__(items, user_cls, **options)
@@ -243,12 +237,12 @@ class DataClassVariable(ConstDictVariable):
         self,
         tx,
         name,
-        args: Sequence[VariableTracker],
-        kwargs: Dict[str, VariableTracker],
-    ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
+        args: Sequence[Variable],
+        kwargs: Dict[str, Variable],
+    ) -> Variable:
+        options = var.propagate(self, args, kwargs.values())
         if name == "__post_init__":
-            user_fn = variables.usermethod(self.user_cls.__post_init__, self)
+            user_fn = var.usermethod(self.user_cls.__post_init__, self)
             return user_fn.call_function(tx, [], {})
         elif name == "__getitem__":
             assert not kwargs and len(args) == 1
@@ -263,18 +257,18 @@ class DataClassVariable(ConstDictVariable):
                 )
         elif name == "to_tuple":
             assert not (args or kwargs)
-            return variables.basetuple(list(self.items.values()), **options)
+            return var.basetuple(list(self.items.values()), **options)
         elif name == "__setattr__":
             name = "__setitem__"
         return super(DataClassVariable, self).call_method(tx, name, args, kwargs)
 
     @typechecked
-    def var_getattr(self, tx, name: str) -> VariableTracker:
+    def var_getattr(self, tx, name: str) -> Variable:
         if name in self.items:
-            return self.call_method(tx, "__getitem__", [variables.constant(name)], {})
+            return self.call_method(tx, "__getitem__", [var.constant(name)], {})
         elif not self.include_none:
             defaults = {f.name: f.default for f in dataclasses.fields(self.user_cls)}
             if name in defaults:
-                assert variables.is_literal(defaults[name])
-                return variables.constant(defaults[name]).trace(self)
+                assert var.is_literal(defaults[name])
+                return var.constant(defaults[name]).trace(self)
         super(DataClassVariable, self).var_getattr(tx, name)

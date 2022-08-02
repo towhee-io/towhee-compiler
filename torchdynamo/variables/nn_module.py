@@ -10,7 +10,7 @@ import torch.nn
 from typeguard import typechecked
 
 from .. import skipfiles
-from .. import variables
+from .. import variables as vars
 from ..allowed_functions import is_allowed
 from ..exc import RestartAnalysis
 from ..exc import unimplemented
@@ -23,14 +23,14 @@ from ..source import NotNNModuleSource
 from ..utils import is_lazy_module
 from ..utils import istype
 from ..utils import proxy_args_kwargs
+from ..variables import Variable
 from .base import MutableLocal
-from .base import VariableTracker
 from .base import typestr
 from .lists import SliceVariable
 from .user_defined import UserDefinedObjectVariable
 
 
-class NNModuleVariable(VariableTracker):
+class NNModuleVariable(Variable):
     _nonvar_fields = ["module_type", "module_key"]
 
     def __init__(self, module_type: type, module_key: str, **kwargs):
@@ -45,7 +45,7 @@ class NNModuleVariable(VariableTracker):
     def unpack_var_sequence(self, tx):
         # implement list/iter/tuple/etc calls
         base = tx.output.get_submodule(self.module_key)
-        options = variables.propagate([self])
+        options = vars.propagate([self])
         assert isinstance(
             base, (torch.nn.ModuleList, torch.nn.ParameterList, torch.nn.Sequential)
         ), typestr(base)
@@ -61,11 +61,11 @@ class NNModuleVariable(VariableTracker):
             for idx, submod in enumerate(base)
         ]
 
-    def call_hasattr(self, tx, name: str) -> VariableTracker:
-        options = variables.propagate(self)
+    def call_hasattr(self, tx, name: str) -> Variable:
+        options = vars.propagate(self)
         mod = tx.output.get_submodule(self.module_key)
         result = hasattr(mod, name)
-        return variables.constant(result, **options).add_guard(
+        return vars.constant(result, **options).add_guard(
             NNModuleSource(AttrSource(self.source, name)).create_guard(
                 GuardBuilder.HASATTR
             )
@@ -83,7 +83,7 @@ class NNModuleVariable(VariableTracker):
         raise RestartAnalysis()
 
     def var_getattr(self, tx, name):
-        options = variables.propagate(self)
+        options = vars.propagate(self)
         guards = options.get("guards", set())
 
         if self.source:
@@ -115,35 +115,35 @@ class NNModuleVariable(VariableTracker):
             object_member = False
 
         if name == "__class__" and not object_member:
-            return variables.UserDefinedClassVariable(base.__class__, **options)
+            return vars.UserDefinedClassVariable(base.__class__, **options)
 
         if object_member:
-            return variables.build(tx, NNModuleSource(source))(subobj)
+            return vars.build(tx, NNModuleSource(source))(subobj)
         else:
             if istype(subobj, property):
-                return variables.userfunc(subobj.fget, guards=guards).call_function(
+                return vars.userfunc(subobj.fget, guards=guards).call_function(
                     tx, [(self)], {}
                 )
             elif istype(subobj, classmethod):
-                return variables.usermethod(
+                return vars.usermethod(
                     subobj.__func__,
-                    variables.UserDefinedObjectVariable(type(base), guards=guards),
+                    vars.UserDefinedObjectVariable(type(base), guards=guards),
                     **options,
                 )
             elif istype(subobj, staticmethod):
-                return variables.userfunc(subobj.__get__(base), **options)
+                return vars.userfunc(subobj.__get__(base), **options)
             elif istype(subobj, types.FunctionType):
-                return variables.usermethod(subobj, self, **options)
+                return vars.usermethod(subobj, self, **options)
             else:
                 unimplemented(f"class property {typestr(base)} {typestr(subobj)}")
 
-        return variables.GetAttrVariable(self, name, **options)
+        return vars.GetAttrVariable(self, name, **options)
 
     @typechecked
     def call_function(
-        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
-    ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
+        self, tx, args: Sequence[Variable], kwargs: Dict[str, Variable]
+    ) -> Variable:
+        options = vars.propagate(self, args, kwargs.values())
         mod = tx.output.get_submodule(self.module_key)
         is_lazy = is_lazy_module(mod)
         if (
@@ -172,7 +172,7 @@ class NNModuleVariable(VariableTracker):
             if is_lazy:
                 self.module_type = mod.cls_to_become
 
-            return variables.TensorVariable.create(
+            return vars.TensorVariable.create(
                 tx=tx,
                 proxy=tx.output.create_proxy(
                     "call_module",
@@ -192,7 +192,7 @@ class NNModuleVariable(VariableTracker):
                 fn = mod.__class__.forward
 
             return tx.inline_user_function_return(
-                variables.userfunc(fn, **options),
+                vars.userfunc(fn, **options),
                 [self] + args,
                 kwargs,
             )
@@ -202,10 +202,10 @@ class NNModuleVariable(VariableTracker):
         self,
         tx,
         name: str,
-        args: Sequence[VariableTracker],
-        kwargs: Dict[str, VariableTracker],
-    ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
+        args: Sequence[Variable],
+        kwargs: Dict[str, Variable],
+    ) -> Variable:
+        options = vars.propagate(self, args, kwargs.values())
         key = self.module_key
         module = tx.output.get_submodule(key)
 
@@ -215,7 +215,7 @@ class NNModuleVariable(VariableTracker):
         if name == "_check_input_dim" and skipfiles.is_torch_inline_allowed(
             inspect.getfile(module.__class__._check_input_dim)
         ):
-            return variables.constant(True, **options)
+            return vars.constant(True, **options)
 
         if not all(
             x.is_python_constant() for x in itertools.chain(args, kwargs.values())
@@ -247,12 +247,12 @@ class NNModuleVariable(VariableTracker):
                         **options,
                     )
                 )
-            return variables.listiter(result, mutable_local=MutableLocal(), **options)
+            return vars.listiter(result, mutable_local=MutableLocal(), **options)
 
         def named_embed(name, obj):
-            return variables.basetuple(
+            return vars.basetuple(
                 [
-                    variables.constant(name, **options),
+                    vars.constant(name, **options),
                     tx.output.add_submodule(
                         obj,
                         key,
@@ -272,14 +272,14 @@ class NNModuleVariable(VariableTracker):
                 **get_kwargs("prefix", "recurse")
             ):
                 result.append(named_embed(name, param))
-            return variables.listiter(result, mutable_local=MutableLocal(), **options)
+            return vars.listiter(result, mutable_local=MutableLocal(), **options)
         elif name == "named_modules":
             result = []
             for name, submod in module.named_modules(
                 **get_kwargs("memo", "prefix", "remove_duplicate")
             ):
                 result.append(named_embed(name, submod))
-            return variables.listiter(result, mutable_local=MutableLocal(), **options)
+            return vars.listiter(result, mutable_local=MutableLocal(), **options)
         elif name == "parameters":
             return wrap_values(module.named_parameters(**get_kwargs("recurse")))
         elif name == "values":
@@ -290,17 +290,17 @@ class NNModuleVariable(VariableTracker):
             result = []
             for name, submod in module.items():
                 result.append(named_embed(name, submod))
-            return variables.listiter(result, mutable_local=MutableLocal(), **options)
+            return vars.listiter(result, mutable_local=MutableLocal(), **options)
         elif name == "__len__":
             assert not (args or kwargs)
-            return variables.constant(len(module), **options)
+            return vars.constant(len(module), **options)
         elif (
             name == "__contains__"
             and isinstance(module, (torch.nn.ModuleDict, torch.nn.ParameterDict))
             and args
             and args[0].is_python_constant()
         ):
-            return variables.constant(
+            return vars.constant(
                 args[0].as_python_constant() in module._modules, **options
             )
         elif name == "__getitem__":
@@ -329,7 +329,7 @@ class NNModuleVariable(VariableTracker):
                             **options,
                         )
                     )
-                return variables.basetuple(result, **options)
+                return vars.basetuple(result, **options)
 
             key = args[0].as_python_constant()
             submod = module[key]
@@ -345,7 +345,7 @@ class NNModuleVariable(VariableTracker):
             assert type(module) is torch.nn.ModuleList
             assert self.source
 
-            return variables.constant(
+            return vars.constant(
                 module._get_abs_string_index(args[0].as_python_constant()), **options
             )
         else:
@@ -389,9 +389,7 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
         ):
             assert self.source
             return [
-                variables.build(tx, source=GetItemSource(self.source, idx))(item).trace(
-                    self
-                )
+                vars.build(tx, source=GetItemSource(self.source, idx))(item).trace(self)
                 for idx, item in enumerate(self.value)
             ]
 
@@ -399,10 +397,8 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
 
     @typechecked
     def call_function(
-        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
-    ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
-
+        self, tx, args: Sequence[Variable], kwargs: Dict[str, Variable]
+    ) -> Variable:
         # TODO mlazos: only support __call__ for lazy modules
         # until we can support a larger swath of python
         if is_lazy_module(self.value):
@@ -410,8 +406,10 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
         else:
             fn = self.value_type.forward
 
-        return variables.userfunc(fn, **options).call_function(
-            tx, [self] + list(args), kwargs
+        return (
+            vars.userfunc(fn)
+            .trace(self, args, kwargs)
+            .call_function(tx, [self] + list(args), kwargs)
         )
 
     @typechecked
@@ -419,10 +417,10 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
         self,
         tx,
         name: str,
-        args: Sequence[VariableTracker],
-        kwargs: Dict[str, VariableTracker],
-    ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
+        args: Sequence[Variable],
+        kwargs: Dict[str, Variable],
+    ) -> Variable:
+        options = vars.propagate(self, args, kwargs.values())
 
         if name not in getattr(self.value, "__dict__", {}):
             try:
@@ -438,13 +436,11 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
                 items = []
                 for name, value in self.value.named_parameters():
                     items.append(
-                        variables.build(tx, AttrSource(self.source, name))(value).trace(
+                        vars.build(tx, AttrSource(self.source, name))(value).trace(
                             options
                         )
                     )
-                return variables.listiter(
-                    items, mutable_local=MutableLocal(), **options
-                )
+                return vars.listiter(items, mutable_local=MutableLocal(), **options)
 
             if id(method.__code__) in self._nn_module_method_ids():
                 unimplemented(f"UnspecializedNNModuleVariable missing {name}")
