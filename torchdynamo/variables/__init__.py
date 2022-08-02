@@ -2,6 +2,7 @@ from typing import Any
 from typing import List
 
 from .base import VariableTracker
+from .base import VariableTracker as Variable
 from .builtin import BuiltinVariable
 from .constant import ConstantVariable
 from .dicts import ConstDictVariable
@@ -42,7 +43,11 @@ from .user_defined import UserDefinedObjectVariable
 
 
 def is_literal(obj: Any) -> bool:
-    return ConstantVariable.is_literal(obj)
+    if type(obj) in (int, float, bool, type(None), str):
+        return True
+    if type(obj) in (list, tuple, set, frozenset):
+        return all(is_literal(x) for x in obj)
+    return False
 
 
 def propagate(*vars: List[List[VariableTracker]]):
@@ -124,6 +129,7 @@ __all__ = [
     "UserDefinedObjectVariable",
     "UserFunctionVariable",
     "UserMethodVariable",
+    "Variable",
     "VariableTracker",
     "WithExitFunctionVariable",
 ]

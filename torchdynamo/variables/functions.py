@@ -2,34 +2,36 @@ import functools
 import inspect
 import itertools
 import types
-from typing import Any, Dict, Sequence
+from typing import Any
+from typing import Dict
+from typing import Sequence
 
 from typeguard import typechecked
 
 import torchdynamo.side_effects
 
-from .. import variables
+from .. import variables as vars
 from ..bytecode_transformation import create_instruction
 from ..exc import unimplemented
 from ..source import AttrSource
 from ..source import GetItemSource
 from ..utils import make_cell
-from .base import VariableTracker
+from ..variables import Variable
 from .base import typestr
 
 
 def wrap_bound_arg(val, options):
     if isinstance(val, dict):
-        return variables.constdict(
+        return vars.constdict(
             {k: wrap_bound_arg(v, options) for k, v in val.items()}, dict, **options
         )
     elif isinstance(val, (tuple, list)):
-        cls = variables.BaseListVariable.cls_for(type(val))
+        cls = vars.BaseListVariable.cls_for(type(val))
         return cls([wrap_bound_arg(x, options) for x in val], **options)
-    elif variables.is_literal(val):
-        return variables.constant(val, **options)
+    elif vars.is_literal(val):
+        return vars.constant(val, **options)
     else:
-        assert isinstance(val, VariableTracker), typestr(val)
+        assert isinstance(val, Variable), typestr(val)
         return val
 
 
@@ -52,7 +54,7 @@ def init_cellvars(parent, result, code):
     return closure_cells
 
 
-class BaseUserFunctionVariable(VariableTracker):
+class BaseUserFunctionVariable(Variable):
     def get_filename(self):
         return self.get_code().co_filename
 
@@ -61,8 +63,8 @@ class BaseUserFunctionVariable(VariableTracker):
 
     @typechecked
     def call_function(
-        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
-    ) -> VariableTracker:
+        self, tx, args: Sequence[Variable], kwargs: Dict[str, Variable]
+    ) -> Variable:
         return tx.inline_user_function_return(
             self, list(self.self_args()) + list(args), kwargs
         )
@@ -102,7 +104,7 @@ class UserFunctionVariable(BaseUserFunctionVariable):
         return self.fn.__globals__
 
     def bind_args(self, parent, args, kwargs):
-        options = variables.propagate([self])
+        options = vars.propagate([self])
         wrap = functools.partial(wrap_bound_arg, options=options)
 
         fn: types.FunctionType = self.fn
@@ -130,7 +132,7 @@ class UserFunctionVariable(BaseUserFunctionVariable):
             itertools.count(), self.fn.__code__.co_freevars, closure
         ):
             if name == "__class__":
-                result[name] = variables.UserDefinedClassVariable(cell.cell_contents)
+                result[name] = vars.UserDefinedClassVariable(cell.cell_contents)
             else:
                 var = parent.output.root_tx.match_nested_cell(name, cell)
                 if var is not None:
@@ -153,7 +155,7 @@ class UserFunctionVariable(BaseUserFunctionVariable):
                         out = side_effects.track_cell_existing(closure_cell, cell)
                         side_effects.store_cell(
                             out,
-                            variables.build(parent, closure_cell_contents)(
+                            vars.build(parent, closure_cell_contents)(
                                 cell.cell_contents
                             ),
                         )
@@ -183,9 +185,9 @@ class UserMethodVariable(UserFunctionVariable):
 
     @typechecked
     def call_function(
-        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
-    ) -> VariableTracker:
-        if isinstance(self.obj, variables.NNModuleVariable) and getattr(
+        self, tx, args: Sequence[Variable], kwargs: Dict[str, Variable]
+    ) -> Variable:
+        if isinstance(self.obj, vars.NNModuleVariable) and getattr(
             self.fn, "__module__", ""
         ).startswith("torch.nn."):
             return self.obj.call_method(tx, self.fn.__name__, args, kwargs).trace(self)
@@ -270,7 +272,7 @@ class NestedUserFunctionVariable(BaseUserFunctionVariable):
         bound.apply_defaults()
         result = dict(bound.arguments.items())
 
-        wrap_args_kwargs(result, VariableTracker.propagate(self))
+        wrap_args_kwargs(result, vars.propagate(self))
         closure_cells = init_cellvars(parent, result, code)
 
         for idx, name in enumerate(code.co_freevars):
@@ -294,12 +296,12 @@ class NestedUserFunctionVariable(BaseUserFunctionVariable):
         if self.kwdefaults:
             flags |= 0x02
             codegen(self.kwdefaults)
-        if isinstance(self.annotations, variables.ConstDictVariable) or isinstance(
-            self.annotations, variables.TupleVariable
+        if isinstance(self.annotations, vars.ConstDictVariable) or isinstance(
+            self.annotations, vars.TupleVariable
         ):
             flags |= 0x04
             try:
-                if isinstance(self.annotations, variables.ConstDictVariable):
+                if isinstance(self.annotations, vars.ConstDictVariable):
                     annotations = {
                         k: v.as_python_constant()
                         for k, v in self.annotations.items.items()
