@@ -12,7 +12,7 @@ from typing import Sequence
 import torch.nn
 from typeguard import typechecked
 
-from .. import variables
+from .. import variables as vars
 from ..exc import unimplemented
 from ..guards import Guard
 from ..guards import GuardBuilder
@@ -21,11 +21,11 @@ from ..source import ODictGetItemSource
 from ..source import RandomValueSource
 from ..utils import is_namedtuple_cls
 from ..utils import namedtuple_fields
+from ..variables import Variable
 from .base import MutableLocal
-from .base import VariableTracker
 
 
-class UserDefinedVariable(VariableTracker):
+class UserDefinedVariable(Variable):
     pass
 
 
@@ -33,17 +33,17 @@ class UserDefinedClassVariable(UserDefinedVariable):
     _as_python_constant_ = "self"
 
     @typechecked
-    def var_getattr(self, tx, name: str) -> VariableTracker:
-        options = variables.propagate(self)
+    def var_getattr(self, tx, name: str) -> Variable:
+        options = vars.propagate(self)
         try:
             obj = inspect.getattr_static(self.value, name)
         except AttributeError:
             obj = None
 
         if isinstance(obj, staticmethod):
-            return variables.userfunc(obj.__get__(self.value), **options)
+            return vars.userfunc(obj.__get__(self.value), **options)
         elif isinstance(obj, classmethod):
-            return variables.usermethod(obj.__func__, self, **options)
+            return vars.usermethod(obj.__func__, self, **options)
 
         return super(UserDefinedClassVariable, self).var_getattr(tx, name)
 
@@ -52,35 +52,33 @@ class UserDefinedClassVariable(UserDefinedVariable):
         self,
         tx,
         name: str,
-        args: Sequence[VariableTracker],
-        kwargs: Dict[str, VariableTracker],
-    ) -> VariableTracker:
+        args: Sequence[Variable],
+        kwargs: Dict[str, Variable],
+    ) -> Variable:
         if (
             name == "__subclasses__"
             and len(args) == 0
             and not kwargs
             and "__subclasses__" not in self.value.__dict__
         ):
-            options = variables.propagate(self, args, kwargs.values())
+            options = vars.propagate(self, args, kwargs.values())
             options["mutable_local"] = MutableLocal()
-            subs_as_vars: List[VariableTracker] = list()
+            subs_as_vars: List[Variable] = list()
             for sub in self.value.__subclasses__():
                 source = AttrSource(tx.import_source(sub.__module__), sub.__name__)
-                subs_as_vars.append(
-                    variables.UserDefinedClassVariable(sub, source=source)
-                )
+                subs_as_vars.append(vars.UserDefinedClassVariable(sub, source=source))
 
-            return variables.baselist(subs_as_vars, **options)
+            return vars.baselist(subs_as_vars, **options)
 
         return super().call_method(tx, args, kwargs)
 
     @typechecked
     def call_function(
-        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
-    ) -> VariableTracker:
+        self, tx, args: Sequence[Variable], kwargs: Dict[str, Variable]
+    ) -> Variable:
         from ..side_effects import SideEffects
 
-        options = variables.propagate(self, args, kwargs.values())
+        options = vars.propagate(self, args, kwargs.values())
 
         if is_namedtuple_cls(self.value):
             fields = namedtuple_fields(self.value)
@@ -90,8 +88,8 @@ class UserDefinedClassVariable(UserDefinedVariable):
                 assert name in fields
                 items[fields.index(name)] = value
             assert all(x is not None for x in items)
-            return variables.NamedTupleVariable(
-                items, self.value, **variables.propagate(self, items)
+            return vars.NamedTupleVariable(
+                items, self.value, **vars.propagate(self, items)
             )
         elif (
             inspect.getattr_static(self.value, "__new__", None) in (object.__new__,)
@@ -101,10 +99,10 @@ class UserDefinedClassVariable(UserDefinedVariable):
             var = tx.output.side_effects.track_object_new(
                 self.source, self.value, UserDefinedObjectVariable, options
             )
-            return var.add_options(var.call_method(tx, "__init__", args, kwargs))
-        elif variables.DataClassVariable.is_matching_cls(self.value):
+            return vars.add_options(vars.call_method(tx, "__init__", args, kwargs))
+        elif vars.DataClassVariable.is_matching_cls(self.value):
             options["mutable_local"] = MutableLocal()
-            return variables.DataClassVariable.create(self.value, args, kwargs, options)
+            return vars.DataClassVariable.create(self.value, args, kwargs, options)
 
         return super().call_function(tx, args, kwargs)
 
@@ -153,10 +151,10 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         self,
         tx,
         name,
-        args: Sequence[VariableTracker],
-        kwargs: Dict[str, VariableTracker],
-    ) -> VariableTracker:
-        options = variables.propagate(self, args, kwargs.values())
+        args: Sequence[Variable],
+        kwargs: Dict[str, Variable],
+    ) -> Variable:
+        options = vars.propagate(self, args, kwargs.values())
 
         if name not in getattr(self.value, "__dict__", {}):
             try:
@@ -165,15 +163,15 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                 method = None
 
             if method is object.__init__:
-                return variables.constant(None, **options)
+                return vars.constant(None, **options)
 
             if method is collections.OrderedDict.keys and self.source:
                 # subclass of OrderedDict
                 assert not (args or kwargs)
                 keys = list(self.value.keys())
-                assert all(map(variables.is_literal, keys))
-                return variables.basetuple(
-                    [variables.constant(k, **options) for k in keys], **options
+                assert all(map(vars.is_literal, keys))
+                return vars.basetuple(
+                    [vars.constant(k, **options) for k in keys], **options
                 ).add_guard(
                     Guard(
                         self.source.name(),
@@ -190,15 +188,15 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                 assert not (args or kwargs)
                 items = []
                 keys = self.call_method(tx, "keys", [], {})
-                options = variables.propagate(self, args, kwargs.values(), keys)
+                options = vars.propagate(self, args, kwargs.values(), keys)
                 for key in keys.unpack_var_sequence(tx):
                     items.append(
-                        variables.basetuple(
+                        vars.basetuple(
                             [key, self.odict_getitem(tx, key)],
                             **options,
                         )
                     )
-                return variables.basetuple(items, **options)
+                return vars.basetuple(items, **options)
 
             if method is collections.OrderedDict.__getitem__ and len(args) == 1:
                 assert not kwargs
@@ -207,7 +205,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             # check for methods implemented in C++
             if isinstance(method, types.FunctionType):
                 # TODO(jansel): add a guard to check for monkey patching?
-                return variables.usermethod(method, self, **options).call_function(
+                return vars.usermethod(method, self, **options).call_function(
                     tx, args, kwargs
                 )
 
@@ -222,8 +220,8 @@ class UserDefinedObjectVariable(UserDefinedVariable):
 
     @typechecked
     def call_function(
-        self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
-    ) -> VariableTracker:
+        self, tx, args: Sequence[Variable], kwargs: Dict[str, Variable]
+    ) -> Variable:
         if (
             self.is_supported_random()
             and all(k.is_python_constant() for k in args)
@@ -238,9 +236,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                     {k: v.as_python_constant() for k, v in kwargs.items()},
                 )
             )
-            return variables.build(tx, source).wrap_unspecialized_primitive(
-                example_value
-            )
+            return vars.build(tx, source).wrap_unspecialized_primitive(example_value)
 
         return super().call_function(tx, args, kwargs)
 
@@ -273,7 +269,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         return subobj
 
     def var_getattr(self, tx, name):
-        options = variables.propagate(self)
+        options = vars.propagate(self)
         value = self.value
         source = AttrSource(self.source, name) if self.source else None
         self._check_for_getattribute()
@@ -283,20 +279,20 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             subobj = self._getattr_static(name)
         except AttributeError:
             if isinstance(getattr_fn, types.FunctionType):
-                return variables.usermethod(getattr_fn, self, **options).call_function(
-                    tx, [variables.constant(name)], {}
+                return vars.usermethod(getattr_fn, self, **options).call_function(
+                    tx, [vars.constant(name)], {}
                 )
             elif getattr_fn is not None:
                 unimplemented("UserDefined with non-function __getattr__")
 
         if isinstance(subobj, property):
-            return variables.usermethod(subobj.fget, self, **options).call_function(
+            return vars.usermethod(subobj.fget, self, **options).call_function(
                 tx, [], {}
             )
 
         if (
             name in getattr(value, "__dict__", {})
-            or variables.is_literal(subobj)
+            or vars.is_literal(subobj)
             or isinstance(
                 subobj,
                 (
@@ -306,9 +302,9 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             )
         ):
             if source:
-                return variables.build(tx, source)(subobj).add_options(options)
-            elif variables.is_literal(subobj):
-                return variables.constant(subobj, **options)
+                return vars.build(tx, source)(subobj).add_options(options)
+            elif vars.is_literal(subobj):
+                return vars.constant(subobj, **options)
 
         if (
             name not in getattr(value, "__dict__", {})
@@ -329,7 +325,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                     ),
                     name,
                 )
-            return variables.build(tx, source)(subobj).add_options(options)
+            return vars.build(tx, source)(subobj).add_options(options)
 
         if isinstance(
             subobj,
@@ -344,12 +340,12 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         if name == "__class__":
             return UserDefinedClassVariable(type(self.value), source=source, **options)
 
-        return variables.GetAttrVariable(self, name, source=source, **options)
+        return vars.GetAttrVariable(self, name, source=source, **options)
 
-    def call_hasattr(self, tx, name: str) -> VariableTracker:
+    def call_hasattr(self, tx, name: str) -> Variable:
         if not self.source:
             unimplemented("hasattr no source")
-        options = variables.propagate(self)
+        options = vars.propagate(self)
         options["guards"].add(
             AttrSource(self.source, name).make_guard(GuardBuilder.HASATTR)
         )
@@ -358,12 +354,12 @@ class UserDefinedObjectVariable(UserDefinedVariable):
 
         try:
             self._getattr_static(name)
-            return variables.constant(True, **options)
+            return vars.constant(True, **options)
         except AttributeError:
-            return variables.constant(False, **options)
+            return vars.constant(False, **options)
 
     def odict_getitem(self, tx, key):
-        return variables.build(
+        return vars.build(
             tx,
             ODictGetItemSource(self.source, key.as_python_constant()),
         )(
