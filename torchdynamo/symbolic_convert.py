@@ -9,7 +9,7 @@ import operator
 import sys
 import traceback
 import types
-from typing import Any
+from typing import Any, Sequence
 from typing import Callable
 from typing import Dict
 from typing import Iterable
@@ -212,7 +212,7 @@ class InstructionTranslatorBase(object):
     def call_function(
         self,
         fn: VariableTracker,
-        args: List[VariableTracker],
+        args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ):
         self.push(fn.call_function(self, args, kwargs))

@@ -8,6 +8,6 @@ def remove_load_call_method(instructions: List[Instruction]):
     rewrites = {"LOAD_METHOD": "LOAD_ATTR", "CALL_METHOD": "CALL_FUNCTION"}
     for inst in instructions:
         if inst.opname in rewrites:
-            inst.opcode=dis.opmap[inst.opname]
             inst.opname=rewrites[inst.opname]
+            inst.opcode=dis.opmap[inst.opname]
     return instructions
