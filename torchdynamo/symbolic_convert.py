@@ -464,7 +464,7 @@ class InstructionTranslatorBase(object):
         self.push(VariableBuilder(self, GlobalSource(inst.argval))(val))
 
     def jump(self, inst):
-        self.instruction_pointer = self.indexof[hash(inst.target)]
+        self.instruction_pointer = self.indexof[id(inst.target)]
 
     JUMP_FORWARD = jump
     JUMP_ABSOLUTE = jump
@@ -1169,7 +1169,7 @@ class InstructionTranslatorBase(object):
 
         # Properties of the input/output code
         self.instructions: List[Instruction] = instructions
-        self.indexof: Dict[int, int] = {hash(i): n for n, i in enumerate(instructions)}
+        self.indexof: Dict[int, int] = {id(i): n for n, i in enumerate(instructions)}
         self.f_globals: Dict[str, Any] = f_globals
         self.f_builtins: Dict[str, Any] = f_builtins
         self.code_options: Dict[str, Any] = code_options
