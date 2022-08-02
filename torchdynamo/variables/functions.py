@@ -137,8 +137,6 @@ class UserFunctionVariable(BaseUserFunctionVariable):
                     # optimization for cleaner codegen
                     result[name] = var
                 elif self.source:
-                    from .builder import VariableBuilder
-
                     side_effects = parent.output.side_effects
                     if cell in side_effects:
                         out = side_effects[cell]
@@ -155,7 +153,7 @@ class UserFunctionVariable(BaseUserFunctionVariable):
                         out = side_effects.track_cell_existing(closure_cell, cell)
                         side_effects.store_cell(
                             out,
-                            VariableBuilder(parent, closure_cell_contents)(
+                            variables.build(parent, closure_cell_contents)(
                                 cell.cell_contents
                             ),
                         )

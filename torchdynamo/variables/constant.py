@@ -1,5 +1,7 @@
 from typing import Dict
-from typing import List
+from typing import Sequence
+
+from typeguard import typechecked
 
 from .. import variables
 from ..utils import istype
@@ -44,11 +46,12 @@ class ConstantVariable(VariableTracker):
             raise NotImplementedError()
         return member
 
+    @typechecked
     def call_method(
         self,
         tx,
         name: str,
-        args: List[VariableTracker],
+        args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> "VariableTracker":
         options = variables.propagate(self, args, kwargs.values())

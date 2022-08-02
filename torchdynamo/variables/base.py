@@ -4,6 +4,7 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Sequence
 from typing import Set
 
 from .. import variables
@@ -234,7 +235,10 @@ class VariableTracker:
         unimplemented(f"hasattr: {self}")
 
     def call_function(
-        self, tx, args: "List[VariableTracker]", kwargs: "Dict[str, VariableTracker]"
+        self,
+        tx,
+        args: Sequence["VariableTracker"],
+        kwargs: Dict[str, "VariableTracker"],
     ) -> "VariableTracker":
         unimplemented(f"call_function {type(self)}: {self} {args} {kwargs}")
 
@@ -242,8 +246,8 @@ class VariableTracker:
         self,
         tx,
         name: str,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
+        args: Sequence["VariableTracker"],
+        kwargs: Dict[str, "VariableTracker"],
     ) -> "VariableTracker":
         if name == "__len__":
             assert not (args or kwargs)
