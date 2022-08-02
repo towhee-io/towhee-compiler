@@ -2,7 +2,8 @@ import collections
 import dataclasses
 import functools
 import inspect
-from typing import Dict, Sequence
+from typing import Dict
+from typing import Sequence
 
 from typeguard import typechecked
 

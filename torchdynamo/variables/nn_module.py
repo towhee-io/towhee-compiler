@@ -83,8 +83,6 @@ class NNModuleVariable(VariableTracker):
         raise RestartAnalysis()
 
     def var_getattr(self, tx, name):
-        from .builder import VariableBuilder
-
         options = variables.propagate(self)
         guards = options.get("guards", set())
 
@@ -120,7 +118,7 @@ class NNModuleVariable(VariableTracker):
             return variables.UserDefinedClassVariable(base.__class__, **options)
 
         if object_member:
-            return VariableBuilder(tx, NNModuleSource(source))(subobj)
+            return variables.build(tx, NNModuleSource(source))(subobj)
         else:
             if istype(subobj, property):
                 return variables.userfunc(subobj.fget, guards=guards).call_function(
@@ -379,8 +377,6 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
         }
 
     def unpack_var_sequence(self, tx):
-        from .builder import VariableBuilder
-
         try:
             fn = inspect.getattr_static(self.value_type, "__iter__")
         except AttributeError:
@@ -393,7 +389,7 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
         ):
             assert self.source
             return [
-                VariableBuilder(tx, source=GetItemSource(self.source, idx))(item).trace(
+                variables.build(tx, source=GetItemSource(self.source, idx))(item).trace(
                     self
                 )
                 for idx, item in enumerate(self.value)
@@ -426,8 +422,6 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
         args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> VariableTracker:
-        from .builder import VariableBuilder
-
         options = variables.propagate(self, args, kwargs.values())
 
         if name not in getattr(self.value, "__dict__", {}):
@@ -444,7 +438,7 @@ class UnspecializedNNModuleVariable(UserDefinedObjectVariable):
                 items = []
                 for name, value in self.value.named_parameters():
                     items.append(
-                        VariableBuilder(tx, AttrSource(self.source, name))(value).trace(
+                        variables.build(tx, AttrSource(self.source, name))(value).trace(
                             options
                         )
                     )

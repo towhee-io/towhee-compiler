@@ -1,4 +1,6 @@
-from typing import Any, List
+from typing import Any
+from typing import List
+
 from .base import VariableTracker
 from .builtin import BuiltinVariable
 from .constant import ConstantVariable
@@ -47,6 +49,12 @@ def propagate(*vars: List[List[VariableTracker]]):
     return VariableTracker.propagate(*vars)
 
 
+def build(*args, **kwargs):
+    from .builder import VariableBuilder
+
+    return VariableBuilder(*args, **kwargs)
+
+
 def constant(*args, **kwargs):
     return ConstantVariable(*args, **kwargs)
 
@@ -70,8 +78,10 @@ def constdict(*args, **kwargs):
 def userfunc(*args, **kwargs):
     return UserFunctionVariable(*args, **kwargs)
 
+
 def usermethod(*args, **kwargs):
     return UserMethodVariable(*args, **kwargs)
+
 
 def torch(*args, **kwargs):
     return TorchVariable(*args, **kwargs)
