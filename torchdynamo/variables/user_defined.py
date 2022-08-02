@@ -5,8 +5,9 @@ import importlib
 import inspect
 import random
 import types
-from typing import Dict, Sequence
+from typing import Dict
 from typing import List
+from typing import Sequence
 
 import torch.nn
 from typeguard import typechecked
@@ -155,10 +156,6 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ) -> VariableTracker:
-        from . import ConstantVariable
-        from . import TupleVariable
-        from . import UserMethodVariable
-
         options = variables.propagate(self, args, kwargs.values())
 
         if name not in getattr(self.value, "__dict__", {}):
@@ -168,15 +165,15 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                 method = None
 
             if method is object.__init__:
-                return ConstantVariable(None, **options)
+                return variables.constant(None, **options)
 
             if method is collections.OrderedDict.keys and self.source:
                 # subclass of OrderedDict
                 assert not (args or kwargs)
                 keys = list(self.value.keys())
-                assert all(map(ConstantVariable.is_literal, keys))
-                return TupleVariable(
-                    [ConstantVariable(k, **options) for k in keys], **options
+                assert all(map(variables.is_literal, keys))
+                return variables.basetuple(
+                    [variables.constant(k, **options) for k in keys], **options
                 ).add_guard(
                     Guard(
                         self.source.name(),
@@ -193,15 +190,15 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                 assert not (args or kwargs)
                 items = []
                 keys = self.call_method(tx, "keys", [], {})
-                options = VariableTracker.propagate(self, args, kwargs.values(), keys)
+                options = variables.propagate(self, args, kwargs.values(), keys)
                 for key in keys.unpack_var_sequence(tx):
                     items.append(
-                        TupleVariable(
+                        variables.basetuple(
                             [key, self.odict_getitem(tx, key)],
                             **options,
                         )
                     )
-                return TupleVariable(items, **options)
+                return variables.basetuple(items, **options)
 
             if method is collections.OrderedDict.__getitem__ and len(args) == 1:
                 assert not kwargs
@@ -227,8 +224,6 @@ class UserDefinedObjectVariable(UserDefinedVariable):
     def call_function(
         self, tx, args: Sequence[VariableTracker], kwargs: Dict[str, VariableTracker]
     ) -> VariableTracker:
-        from .builder import VariableBuilder
-
         if (
             self.is_supported_random()
             and all(k.is_python_constant() for k in args)
@@ -243,7 +238,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                     {k: v.as_python_constant() for k, v in kwargs.items()},
                 )
             )
-            return VariableBuilder(tx, source).wrap_unspecialized_primitive(
+            return variables.build(tx, source).wrap_unspecialized_primitive(
                 example_value
             )
 
@@ -278,10 +273,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         return subobj
 
     def var_getattr(self, tx, name):
-        from . import ConstantVariable
-        from .builder import VariableBuilder
-
-        options = VariableTracker.propagate(self)
+        options = variables.propagate(self)
         value = self.value
         source = AttrSource(self.source, name) if self.source else None
         self._check_for_getattribute()
@@ -291,16 +283,16 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             subobj = self._getattr_static(name)
         except AttributeError:
             if isinstance(getattr_fn, types.FunctionType):
-                return variables.usermethod(
-                    getattr_fn, self, **options
-                ).call_function(tx, [ConstantVariable(name)], {})
+                return variables.usermethod(getattr_fn, self, **options).call_function(
+                    tx, [variables.constant(name)], {}
+                )
             elif getattr_fn is not None:
                 unimplemented("UserDefined with non-function __getattr__")
 
         if isinstance(subobj, property):
-            return variables.usermethod(
-                subobj.fget, self, **options
-            ).call_function(tx, [], {})
+            return variables.usermethod(subobj.fget, self, **options).call_function(
+                tx, [], {}
+            )
 
         if (
             name in getattr(value, "__dict__", {})
@@ -314,9 +306,9 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             )
         ):
             if source:
-                return VariableBuilder(tx, source)(subobj).add_options(options)
+                return variables.build(tx, source)(subobj).add_options(options)
             elif variables.is_literal(subobj):
-                return ConstantVariable(subobj, **options)
+                return variables.constant(subobj, **options)
 
         if (
             name not in getattr(value, "__dict__", {})
@@ -337,7 +329,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                     ),
                     name,
                 )
-            return VariableBuilder(tx, source)(subobj).add_options(options)
+            return variables.build(tx, source)(subobj).add_options(options)
 
         if isinstance(
             subobj,
@@ -371,9 +363,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             return variables.constant(False, **options)
 
     def odict_getitem(self, tx, key):
-        from .builder import VariableBuilder
-
-        return VariableBuilder(
+        return variables.build(
             tx,
             ODictGetItemSource(self.source, key.as_python_constant()),
         )(

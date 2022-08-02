@@ -578,13 +578,12 @@ class TensorWithTFOverrideVariable(VariableTracker):
         """
         from torchdynamo.variables import UserDefinedClassVariable
         from torchdynamo.variables.builder import TupleVariable
-        from torchdynamo.variables.builder import VariableBuilder
 
         source = AttrSource(
             AttrSource(tensor_with_tf_override_source, "__torch_function__"),
             "__func__",
         )
-        tf_func_var = VariableBuilder(tx, source)(tf_func)
+        tf_func_var = variables.build(tx, source)(tf_func)
         type_var = UserDefinedClassVariable(subclass_type, **options)
 
         # signature:
