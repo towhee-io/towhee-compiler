@@ -128,15 +128,20 @@ def nebullvm(subgraph):
                 print(f"Found the cached model in ", str_cached_model_dir)
             return PytorchONNXInferenceLearner.load(str_cached_model_dir)
         else:
-            if debug:
-                print(f"Saving the model to ", str_cached_model_dir)
-            cached_model_dir.mkdir(parents=True)
-            return optimize_torch_model(
-                model=model,
-                save_dir=str_cached_model_dir,
-                dataloader=[[inputs, None]],
-                perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-            )
+            try:
+                if debug:
+                    print(f"Saving the model to ", str_cached_model_dir)
+                cached_model_dir.mkdir(parents=True)
+                return optimize_torch_model(
+                    model=model,
+                    save_dir=str_cached_model_dir,
+                    dataloader=[[inputs, None]],
+                    perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
+                )
+            except Exception as e:
+                if debug:
+                    print(f"Failed to save the model, error:", e)
+                cached_model_dir.rmdir()
 
 
 @create_backend
