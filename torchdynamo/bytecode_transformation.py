@@ -299,10 +299,10 @@ def transform_code_object(code, transformations, safe=False):
 def cleaned_instructions(code, safe=False):
     instructions = list(map(Instruction.from_dis, dis.get_instructions(code)))
     check_offsets(instructions)
-    instructions = virtualize_jumps(instructions)
+    virtualize_jumps(instructions)
     strip_extended_args(instructions)
     if not safe:
-        instructions = remove_load_call_method(instructions)
+        remove_load_call_method(instructions)
         explicit_super(code, instructions)
     return instructions
 
