@@ -10,7 +10,7 @@ from typing import Callable
 import torch
 from torch.fx.graph_module import _forward_from_src as original_forward_from_src
 
-from torchdynamo import passes
+from towhee.compiler import passes
 
 from . import config
 from .allowed_functions import is_allowed

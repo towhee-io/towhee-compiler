@@ -4,8 +4,12 @@ import sys
 import types
 from typing import List
 
+from towhee.compiler.bytecode import Instruction
+from towhee.compiler.bytecode import create_instruction
+from towhee.compiler.passes.bytecode import remove_load_call_method
+from towhee.compiler.passes.bytecode import virtualize_jumps
+
 from .bytecode_analysis import stacksize_analysis
-from .ir import Instruction, create_instruction
 
 
 def lnotab_writer(lineno, byteno=0):
@@ -85,18 +89,6 @@ def assemble(instructions: List[dis.Instruction], firstlineno):
     return bytes(code), bytes(lnotab)
 
 
-def virtualize_jumps(instructions):
-    """Replace jump targets with pointers to make editing easier"""
-    jump_targets = {inst.offset: inst for inst in instructions}
-
-    for inst in instructions:
-        if inst.opcode in dis.hasjabs or inst.opcode in dis.hasjrel:
-            for offset in (0, 2, 4, 6):
-                if jump_targets[inst.argval + offset].opcode != dis.EXTENDED_ARG:
-                    inst.target = jump_targets[inst.argval + offset]
-                    break
-
-
 def devirtualize_jumps(instructions):
     """Fill in args for virtualized jump target after instructions may have moved"""
     indexof = {id(inst): i for i, inst, in enumerate(instructions)}
@@ -135,16 +127,6 @@ def devirtualize_jumps(instructions):
 
 def strip_extended_args(instructions: List[Instruction]):
     instructions[:] = [i for i in instructions if i.opcode != dis.EXTENDED_ARG]
-
-
-def remove_load_call_method(instructions: List[Instruction]):
-    """LOAD_METHOD puts a NULL on the stack which causes issues, so remove it"""
-    rewrites = {"LOAD_METHOD": "LOAD_ATTR", "CALL_METHOD": "CALL_FUNCTION"}
-    for inst in instructions:
-        if inst.opname in rewrites:
-            inst.opname = rewrites[inst.opname]
-            inst.opcode = dis.opmap[inst.opname]
-    return instructions
 
 
 def explicit_super(code: types.CodeType, instructions: List[Instruction]):
@@ -317,10 +299,10 @@ def transform_code_object(code, transformations, safe=False):
 def cleaned_instructions(code, safe=False):
     instructions = list(map(Instruction.from_dis, dis.get_instructions(code)))
     check_offsets(instructions)
-    virtualize_jumps(instructions)
+    instructions = virtualize_jumps(instructions)
     strip_extended_args(instructions)
     if not safe:
-        remove_load_call_method(instructions)
+        instructions = remove_load_call_method(instructions)
         explicit_super(code, instructions)
     return instructions
 
