@@ -29,12 +29,8 @@ else:
 
 from . import bytecode
 from .pass_manager import PassManager
-from .remove_dead_code import remove_dead_code
-from .remove_pointless_jumps import remove_pointless_jumps
 
 __all__ = [
-    "remove_dead_code",
-    "remove_pointless_jumps",
-    "PassManager",
     "bytecode",
+    "PassManager",
 ]
