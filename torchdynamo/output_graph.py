@@ -12,13 +12,13 @@ from typing import List
 
 import torch.nn
 from torch import fx
+from towhee.compiler.bytecode import Instruction
+from towhee.compiler.bytecode import create_instruction
 
 import torchdynamo
 
 from . import config
 from . import variables
-from .ir import Instruction
-from .ir import create_instruction
 from .bytecode_transformation import unique_id
 from .codegen import PyCodegen
 from .exc import BackendCompilerFailed
@@ -139,7 +139,11 @@ class OutputGraph(fx.Tracer):
                     name = f"{name}_{i}"
                     break
 
-        ctx = self.graph.inserting_after(placeholders[-1]) if placeholders else self.graph.inserting_before(None)
+        ctx = (
+            self.graph.inserting_after(placeholders[-1])
+            if placeholders
+            else self.graph.inserting_before(None)
+        )
         with ctx:
             return self.create_proxy("placeholder", name, (), {}, type_expr=type_expr)
 
