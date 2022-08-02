@@ -9,7 +9,7 @@ import operator
 import sys
 import traceback
 import types
-from typing import Any
+from typing import Any, Sequence
 from typing import Callable
 from typing import Dict
 from typing import Iterable
@@ -212,7 +212,7 @@ class InstructionTranslatorBase(object):
     def call_function(
         self,
         fn: VariableTracker,
-        args: List[VariableTracker],
+        args: Sequence[VariableTracker],
         kwargs: Dict[str, VariableTracker],
     ):
         self.push(fn.call_function(self, args, kwargs))
@@ -464,7 +464,7 @@ class InstructionTranslatorBase(object):
         self.push(VariableBuilder(self, GlobalSource(inst.argval))(val))
 
     def jump(self, inst):
-        self.instruction_pointer = self.indexof[hash(inst.target)]
+        self.instruction_pointer = self.indexof[id(inst.target)]
 
     JUMP_FORWARD = jump
     JUMP_ABSOLUTE = jump
@@ -1169,7 +1169,7 @@ class InstructionTranslatorBase(object):
 
         # Properties of the input/output code
         self.instructions: List[Instruction] = instructions
-        self.indexof: Dict[int, int] = {hash(i): n for n, i in enumerate(instructions)}
+        self.indexof: Dict[int, int] = {id(i): n for n, i in enumerate(instructions)}
         self.f_globals: Dict[str, Any] = f_globals
         self.f_builtins: Dict[str, Any] = f_builtins
         self.code_options: Dict[str, Any] = code_options

@@ -2,9 +2,8 @@ import dis
 from dataclasses import dataclass
 from typing import Any, Optional
 
-instruction_counter = 0
 
-@dataclass(frozen=True)
+@dataclass
 class Instruction:
     """A mutable version of dis.Instruction"""
 
@@ -17,15 +16,9 @@ class Instruction:
     is_jump_target: bool = False
     # extra fields to make modification easier:
     target: Optional[dis.Instruction] = None
-    _id: int = None
-    
-    def __post_init__(self):
-        global instruction_counter
-        self._id = instruction_counter
-        instruction_counter += 1
 
     def __hash__(self):
-        return self._id
+        return id(self)
 
     def __eq__(self, other):
         return id(self) == id(other)
