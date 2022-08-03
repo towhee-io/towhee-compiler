@@ -25,7 +25,7 @@ from torch.utils._pytree import tree_map
 from torchdynamo.guards import GuardBuilder
 
 from .. import config
-from .. import variables
+from .. import variables as vars
 from ..exc import TorchRuntimeError
 from ..exc import unimplemented
 from ..source import AttrSource
@@ -34,8 +34,8 @@ from ..utils import is_lazy_module
 from ..utils import istype
 from ..utils import product
 from ..utils import proxy_args_kwargs
+from ..variables import Variable
 from .base import MutableLocal
-from .base import VariableTracker
 from .base import typestr
 from .lists import ShapeVariable
 from .lists import SizeVariable
@@ -54,7 +54,7 @@ def preserve_rng_state():
             torch.cuda.set_rng_state(cuda_rng)
 
 
-class TensorVariable(VariableTracker):
+class TensorVariable(Variable):
     """A torch.Tensor input or an intermediate value in the FX graph"""
 
     _nonvar_fields = [
@@ -179,7 +179,7 @@ class TensorVariable(VariableTracker):
         elif istype(example_value, torch.Size) and all(
             [isinstance(x, int) for x in example_value]
         ):
-            sizes = [variables.ConstantVariable(x) for x in example_value]
+            sizes = [vars.constant(x) for x in example_value]
             return SizeVariable(sizes, **options)
         elif isinstance(example_value, (tuple, list)):
             unpacked = []
@@ -187,7 +187,7 @@ class TensorVariable(VariableTracker):
                 if val is None:
                     # nn.MultiheadAttention() can return None, see issue #175
                     unpacked.append(
-                        variables.ConstantVariable(None, **options),
+                        vars.constant(None, **options),
                     )
                 else:
                     unpacked.append(
@@ -201,27 +201,25 @@ class TensorVariable(VariableTracker):
                         )
                     )
             if istype(example_value, tuple):
-                return variables.basetuple(unpacked, **options)
+                return vars.basetuple(unpacked, **options)
             elif istype(example_value, (list, immutable_list)):
-                return variables.baselist(
-                    unpacked, mutable_local=MutableLocal(), **options
-                )
+                return vars.baselist(unpacked, mutable_local=MutableLocal(), **options)
             else:
                 assert (
                     example_value.__class__.__module__ == "torch.return_types"
                     or hasattr(example_value, "_fields")
                 ), "namedtuple?"
-                return variables.NamedTupleVariable(
+                return vars.NamedTupleVariable(
                     unpacked, example_value.__class__, **options
                 )
         elif example_value is None or proxy.node.target is torch.manual_seed:
-            return variables.ConstantVariable(None, **options)
+            return vars.constant(None, **options)
         elif (
             isinstance(example_value, int)
             and proxy.node.target is torch._utils._element_size
         ):
             proxy.node.meta["example_value"] = example_value
-            return variables.ConstantVariable(example_value, **options)
+            return vars.constant(example_value, **options)
         elif (
             isinstance(example_value, numbers.Number)
             and proxy.node.target == "item"
@@ -319,29 +317,29 @@ class TensorVariable(VariableTracker):
 
     def var_getattr(self, tx, name):
         result = None
-        options = VariableTracker.propagate(self)
+        options = vars.propagate(self)
         if name == "ndim" and self.ndim is not None:
-            result = variables.constant(self.ndim, **options)
+            result = vars.constant(self.ndim, **options)
         elif name == "dtype" and self.dtype is not None:
-            result = variables.torch(self.dtype, **options)
+            result = vars.torch(self.dtype, **options)
         elif name == "device" and self.device is not None:
-            result = variables.torch(self.device, **options)
+            result = vars.torch(self.device, **options)
         elif name == "is_cuda" and self.device is not None:
-            result = variables.constant(self.device.type == "cuda", **options)
+            result = vars.constant(self.device.type == "cuda", **options)
         elif name == "shape" and self.size is not None:
-            sizes = [variables.constant(x) for x in self.size]
+            sizes = [vars.constant(x) for x in self.size]
             result = ShapeVariable(sizes, **options)
         elif name == "requires_grad" and self.requires_grad is not None:
-            result = variables.constant(self.requires_grad, **options)
+            result = vars.constant(self.requires_grad, **options)
         elif name == "is_quantized" and self.is_quantized is not None:
-            result = variables.constant(self.is_quantized, **options)
+            result = vars.constant(self.is_quantized, **options)
         elif name == "shape" and self.size is None:
             result = self.call_method(tx, "size", [], {})
         elif name == "ndim" and self.ndim is None:
             result = self.call_method(tx, "dim", [], {})
 
         if name == "__class__":
-            return variables.torch(self.python_type(), **options)
+            return vars.torch(self.python_type(), **options)
 
         # Add a guard for type matching, these guards are checked before tensor guards
         # In some cases, a <tensor>.<attr> guard can be evaluated first, and break if
@@ -355,11 +353,11 @@ class TensorVariable(VariableTracker):
         return result
 
     def unpack_var_sequence(self, tx):
-        options = VariableTracker.propagate(self)
+        options = vars.propagate(self)
         if self.size:
             return [
-                variables.BuiltinVariable(operator.getitem, **options).call_function(
-                    tx, [self, variables.ConstantVariable(i)], {}
+                vars.BuiltinVariable(operator.getitem, **options).call_function(
+                    tx, [self, vars.ConstantVariable(i)], {}
                 )
                 for i in range(self.size[0])
             ]
@@ -370,29 +368,26 @@ class TensorVariable(VariableTracker):
         self,
         tx,
         name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
-        from . import ConstantVariable
-        from . import TupleVariable
-
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        args: List[Variable],
+        kwargs: Dict[str, Variable],
+    ) -> Variable:
+        options = vars.propagate(self, args, kwargs.values())
 
         if name == "stride" and self.stride is not None:
-            constant_result = ConstantVariable(self.stride, **options)
+            constant_result = vars.constant(self.stride, **options)
         elif name == "size" and self.size is not None:
-            sizes = [variables.ConstantVariable(x) for x in self.size]
+            sizes = [vars.constant(x) for x in self.size]
             constant_result = SizeVariable(sizes, **options)
         elif name == "numel" and self.size is not None:
-            constant_result = ConstantVariable(product(self.size), **options)
+            constant_result = vars.constant(product(self.size), **options)
         elif name in ("ndimension", "dim") and self.ndim is not None:
-            constant_result = ConstantVariable(self.ndim, **options)
+            constant_result = vars.constant(self.ndim, **options)
         elif name == "is_floating_point" and self.dtype is not None:
-            constant_result = ConstantVariable(self.dtype.is_floating_point, **options)
+            constant_result = vars.constant(self.dtype.is_floating_point, **options)
         elif name == "is_contiguous" and self.is_contiguous is not None:
-            constant_result = ConstantVariable(self.is_contiguous, **options)
+            constant_result = vars.constant(self.is_contiguous, **options)
         elif name == "is_complex" and self.is_complex is not None:
-            constant_result = ConstantVariable(self.is_complex, **options)
+            constant_result = vars.constant(self.is_complex, **options)
         else:
             constant_result = None
 
@@ -401,7 +396,7 @@ class TensorVariable(VariableTracker):
             if len(args) == 1:
                 return constant_result.getitem_const(args[0])
             elif args:
-                return TupleVariable(
+                return vars.basetuple(
                     [constant_result.getitem_const(a) for a in args], **options
                 )
             return constant_result
@@ -431,7 +426,7 @@ class TensorVariable(VariableTracker):
         elif name == "__len__":
             if self.size:
                 assert not config.dynamic_shapes
-                return ConstantVariable(self.size[0], **options)
+                return vars.constant(self.size[0], **options)
             else:
                 return self.__class__.create(
                     tx,
@@ -447,7 +442,7 @@ class TensorVariable(VariableTracker):
                 operator.setitem,
                 *proxy_args_kwargs([self] + args, kwargs),
             )
-            return ConstantVariable(None, **options)
+            return vars.constant(None, **options)
         else:
             # Convert x.new(torch.Size) into x.new_empty(torch.Size),
             # as Tensor.new acts differently with a Size input versus a tuple input.
@@ -480,15 +475,15 @@ class DynamicShapeVariable(TensorVariable):
     def unpack_var_sequence(self, tx):
         if self.dyn_shape_len is not None:
             return [
-                variables.BuiltinVariable(
-                    operator.getitem, **VariableTracker.propagate(self)
-                ).call_function(tx, [self, variables.ConstantVariable(i)], {})
+                vars.BuiltinVariable(
+                    operator.getitem, **vars.propagate(self)
+                ).call_function(tx, [self, vars.constant(i)], {})
                 for i in range(self.dyn_shape_len)
             ]
         super(DynamicShapeVariable, self).unpack_var_sequence(tx)
 
 
-class TensorWithTFOverrideVariable(VariableTracker):
+class TensorWithTFOverrideVariable(Variable):
     """
     Represents a tensor subclass instance with a __torch_function__ override.
     """
@@ -511,14 +506,14 @@ class TensorWithTFOverrideVariable(VariableTracker):
         self,
         tx,
         name,
-        args: "List[VariableTracker]",
-        kwargs: "Dict[str, VariableTracker]",
-    ) -> "VariableTracker":
+        args: List[Variable],
+        kwargs: Dict[str, Variable],
+    ) -> Variable:
         # This code block implements inlining the __torch_function__ override
         # of `call_method`.
         from . import GetAttrVariable
 
-        options = VariableTracker.propagate(self, args, kwargs.values())
+        options = vars.propagate(self, args, kwargs.values())
         # insert unwrapped version of self as the first argument
         args = list(args)
         args.insert(0, self.tensor_variable)
@@ -583,7 +578,7 @@ class TensorWithTFOverrideVariable(VariableTracker):
             AttrSource(tensor_with_tf_override_source, "__torch_function__"),
             "__func__",
         )
-        tf_func_var = variables.build(tx, source)(tf_func)
+        tf_func_var = vars.build(tx, source)(tf_func)
         type_var = UserDefinedClassVariable(subclass_type, **options)
 
         # signature:

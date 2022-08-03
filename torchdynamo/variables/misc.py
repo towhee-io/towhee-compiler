@@ -8,7 +8,7 @@ from typing import Sequence
 import torch._C
 from typeguard import typechecked
 
-from .. import variables as var
+from .. import variables as vars
 from ..bytecode_transformation import create_instruction
 from ..exc import unimplemented
 from ..guards import Guard
