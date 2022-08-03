@@ -1,11 +1,23 @@
 import dis
-from dataclasses import dataclass
 from typing import Any, Optional
+from recordclass import dataobject
 
-
-@dataclass
-class Instruction:
-    """A mutable version of dis.Instruction"""
+# @dataclass
+class Instruction(dataobject):
+    """Mutable Instruction with acceleration and storage optimization
+    
+    Examples:
+    
+    1. create an instruction:
+    
+    >>> inst = Instruction(0, "test_inst", None, 0)
+    >>> inst
+    Instruction(opcode=0, opname='test_inst', arg=None, argval=0, offset=None, starts_line=None, is_jump_target=False, target=None, argrepr=None)
+    
+    2. the instruction object is mutable:
+    
+    >>> inst.opcode = 1
+    """
 
     opcode: int
     opname: str
@@ -16,12 +28,13 @@ class Instruction:
     is_jump_target: bool = False
     # extra fields to make modification easier:
     target: Optional[dis.Instruction] = None
+    argrepr: Optional[str] = None
 
-    def __hash__(self):
-        return id(self)
+    # def __hash__(self):
+    #     return id(self)
 
-    def __eq__(self, other):
-        return id(self) == id(other)
+    # def __eq__(self, other):
+    #     return id(self) == id(other)
 
     @staticmethod
     def from_dis(i: dis.Instruction):
