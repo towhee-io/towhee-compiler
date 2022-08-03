@@ -12,13 +12,13 @@ from .codegen import PyCodegen
 from .source import LocalSource
 from .source import Source
 from .utils import object_new
-from .variables.base import VariableTracker
+from .variables import Variable
 
 
 @dataclasses.dataclass
 class MutableSideEffects:
     """
-    VariableTracker.mutable_local marker to indicate a list passed as
+    Variable.mutable_local marker to indicate a list passed as
     an input that if we mutate we need to re-apply those mutations after
     the graph runs.
     """
@@ -36,7 +36,7 @@ class MutableSideEffects:
 @dataclasses.dataclass
 class AttributeMutation:
     """
-    VariableTracker.mutable_local marker to track changes to attributes
+    Variable.mutable_local marker to track changes to attributes
     """
 
     source: Source
@@ -89,11 +89,10 @@ class SideEffects(object):
             cache = dict()
 
         self.id_to_variable = collections.OrderedDict(
-            (k, VariableTracker.apply(fn, v, cache))
-            for k, v in self.id_to_variable.items()
+            (k, Variable.apply(fn, v, cache)) for k, v in self.id_to_variable.items()
         )
         self.store_attr_mutations = collections.OrderedDict(
-            (k, VariableTracker.apply(fn, v, cache))
+            (k, Variable.apply(fn, v, cache))
             for k, v in self.store_attr_mutations.items()
         )
 
@@ -103,7 +102,7 @@ class SideEffects(object):
     def __getitem__(self, item):
         return self.id_to_variable[id(item)]
 
-    def store_attr(self, item: VariableTracker, name: str, value: VariableTracker):
+    def store_attr(self, item: Variable, name: str, value: Variable):
         assert self.is_attribute_mutation(item)
         if item.mutable_local not in self.store_attr_mutations:
             self.store_attr_mutations[item.mutable_local] = collections.OrderedDict()
@@ -115,20 +114,20 @@ class SideEffects(object):
 
     def store_cell(self, cellvar, value):
         assert isinstance(cellvar, variables.NewCellVariable)
-        assert isinstance(value, variables.VariableTracker)
+        assert isinstance(value, Variable)
         self.store_attr(cellvar, "cell_contents", value)
 
     def load_cell(self, cellvar):
         assert isinstance(cellvar, variables.NewCellVariable)
         return self.load_attr(cellvar, "cell_contents")
 
-    def load_global(self, gvar: VariableTracker, name: str):
-        assert isinstance(gvar, variables.VariableTracker)
+    def load_global(self, gvar: Variable, name: str):
+        assert isinstance(gvar, Variable)
         return self.load_attr(gvar, name)
 
-    def store_global(self, gvar: VariableTracker, name: str, value: VariableTracker):
-        assert isinstance(gvar, variables.VariableTracker)
-        assert isinstance(value, variables.VariableTracker)
+    def store_global(self, gvar: Variable, name: str, value: Variable):
+        assert isinstance(gvar, Variable)
+        assert isinstance(value, Variable)
         self.store_attr(gvar, name, value)
 
     @staticmethod
@@ -152,7 +151,7 @@ class SideEffects(object):
         self,
         source: Source,
         item: Any,
-        variable: VariableTracker,
+        variable: Variable,
         mutable_cls=MutableSideEffects,
     ):
         """Start tracking a new variable for mutation"""
@@ -168,7 +167,7 @@ class SideEffects(object):
         self,
         source: Source,
         item: Any,
-        variable: VariableTracker,
+        variable: Variable,
     ):
         return self._track_obj(
             source, item, variable, mutable_cls=AttributeMutationExisting
@@ -220,7 +219,7 @@ class SideEffects(object):
         live_new_objects = set()
         skip_obj = None
 
-        def visit(var: VariableTracker):
+        def visit(var: Variable):
             if (
                 isinstance(var.mutable_local, AttributeMutationNew)
                 and var.mutable_local is not skip_obj
@@ -228,20 +227,20 @@ class SideEffects(object):
                 live_new_objects.add(var.mutable_local)
             return var
 
-        def is_live(var: VariableTracker):
+        def is_live(var: Variable):
             if isinstance(var, AttributeMutationNew):
                 return var in live_new_objects
-            if isinstance(var, VariableTracker):
+            if isinstance(var, Variable):
                 return is_live(var.mutable_local)
             return True
 
-        VariableTracker.apply(visit, (tx.stack, tx.symbolic_locals))
+        Variable.apply(visit, (tx.stack, tx.symbolic_locals))
         for var in self.id_to_variable.values():
             if not isinstance(var.mutable_local, AttributeMutationNew):
-                VariableTracker.apply(visit, var)
+                Variable.apply(visit, var)
 
         for skip_obj, setattrs in self.store_attr_mutations.items():
-            VariableTracker.apply(visit, setattrs)
+            Variable.apply(visit, setattrs)
 
         self.id_to_variable = collections.OrderedDict(
             (k, v) for k, v in self.id_to_variable.items() if is_live(v)

@@ -18,7 +18,7 @@ from .source import Source
 from .utils import is_safe_constant
 from .utils import istype
 from .utils import rot_n_helper
-from .variables.base import VariableTracker
+from .variables import Variable
 from .variables.nn_module import NNModuleVariable
 from .variables.tensor import TensorVariable
 from .variables.tensor import TensorWithTFOverrideVariable
@@ -29,9 +29,9 @@ from .variables.tensor import UnspecializedPythonVariable
 @dataclasses.dataclass
 class GraphOutputEntry:
     index: int
-    variable: VariableTracker
+    variable: Variable
 
-    def merge(self, other: VariableTracker):
+    def merge(self, other: Variable):
         # merge in any extra guards
         self.variable = self.variable.add_options(other)
 
@@ -79,7 +79,7 @@ class PyCodegen(object):
 
         self.tx.output.guards.update(value.guards)
 
-        assert isinstance(value, VariableTracker)
+        assert isinstance(value, Variable)
         output = self._output
         graph_outputs = self.graph_outputs
 
