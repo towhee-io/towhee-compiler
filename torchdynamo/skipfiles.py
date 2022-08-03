@@ -163,6 +163,7 @@ for _name in (
     "tvm",
     "fx2trt_oss",
     "xarray",
+    "towhee",
 ):
     add(_name)
 
