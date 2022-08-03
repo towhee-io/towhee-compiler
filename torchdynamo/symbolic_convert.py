@@ -1194,11 +1194,11 @@ class InstructionTranslator(InstructionTranslatorBase):
             f_code=f_code,
         )
         self.one_graph: bool = one_graph
-        vars = list(code_options["co_varnames"])
-        vars.extend(x for x in self.cell_and_freevars() if x not in vars)
+        varlist = list(code_options["co_varnames"])
+        varlist.extend(x for x in self.cell_and_freevars() if x not in varlist)
         self.symbolic_locals = collections.OrderedDict(
             (k, vars.build(self, LocalSource(k))(f_locals[k]))
-            for k in vars
+            for k in varlist
             if k in f_locals
         )
 
