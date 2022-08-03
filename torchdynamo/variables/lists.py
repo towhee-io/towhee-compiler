@@ -1,3 +1,4 @@
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Sequence
@@ -26,10 +27,9 @@ class BaseListVariable(Variable):
             tuple: TupleVariable,
         }[obj]
 
-    def __init__(self, items: List[Variable], **kwargs):
+    @typechecked
+    def __init__(self, items: List[Variable], **kwargs: Any):
         super(BaseListVariable, self).__init__(**kwargs)
-        assert isinstance(items, list)
-        assert all(isinstance(x, Variable) for x in items)
         self.items: List[Variable] = items
 
     def _as_proxy(self):
@@ -328,10 +328,9 @@ class SliceVariable(BaseListVariable):
 
 
 class ListIteratorVariable(Variable):
-    def __init__(self, items, index: int = 0, **kwargs):
+    @typechecked
+    def __init__(self, items, index: int = 0, **kwargs: Any):
         super(ListIteratorVariable, self).__init__(**kwargs)
-        assert isinstance(items, list)
-        assert all(isinstance(x, Variable) for x in items)
         self.items = items
         self.index = index
 

@@ -99,7 +99,7 @@ class UserDefinedClassVariable(UserDefinedVariable):
             var = tx.output.side_effects.track_object_new(
                 self.source, self.value, UserDefinedObjectVariable, options
             )
-            return vars.add_options(vars.call_method(tx, "__init__", args, kwargs))
+            return var.add_options(var.call_method(tx, "__init__", args, kwargs))
         elif vars.DataClassVariable.is_matching_cls(self.value):
             options["mutable_local"] = MutableLocal()
             return vars.DataClassVariable.create(self.value, args, kwargs, options)
