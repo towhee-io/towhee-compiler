@@ -192,10 +192,7 @@ class InstructionTranslatorBase(object):
 
     @typechecked
     def call_function(
-        self,
-        fn: Variable,
-        args: Sequence[Variable],
-        kwargs: Dict[str, Variable],
+        self, fn: Variable, args: Sequence[Variable], kwargs: Dict[str, Variable]
     ):
         self.push(fn.call_function(self, args, kwargs))
 
@@ -320,9 +317,6 @@ class InstructionTranslatorBase(object):
 
     @typechecked
     def push(self, val: Optional[Variable]):
-        assert val is None or isinstance(
-            val, Variable
-        ), f"push expects Variable, got {typestr(val)}"
         self.stack.append(val)
 
     def push_many(self, vals: List[TensorVariable]):
