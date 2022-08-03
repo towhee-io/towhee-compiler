@@ -50,8 +50,8 @@ def is_literal(obj: Any) -> bool:
     return False
 
 
-def propagate(*vars: List[List[VariableTracker]]):
-    return VariableTracker.propagate(*vars)
+def propagate(*vars: List[List[Variable]]):
+    return Variable.propagate(*vars)
 
 
 def build(*args, **kwargs):

@@ -560,7 +560,7 @@ class TensorWithTFOverrideVariable(Variable):
            x1 = torch.sigmoid(x0)
 
         And `x0` has an override, then:
-        * `original_func_var` will be a `VariableTracker` object wrapping `torch.sigmoid`
+        * `original_func_var` will be a `Variable` object wrapping `torch.sigmoid`
         * `tensor_with_tf_override_source` will be the `Source` object from
           the original tensor override instance in the beginning of the program
         * `tf_func` will be the custom `__torch_function__` function

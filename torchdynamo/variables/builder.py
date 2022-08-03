@@ -86,7 +86,7 @@ class GraphArg:
 
 
 class VariableBuilder:
-    """Wrap a python value in a VariableTracker() instance"""
+    """Wrap a python value in a Variable() instance"""
 
     def __init__(
         self,
