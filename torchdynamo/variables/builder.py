@@ -165,7 +165,7 @@ class VariableBuilder:
             guards = self.make_guards(GuardBuilder.EQUALS_MATCH)
             return RangeVariable(value=value, guards=guards)
         elif istype(value, (dict, collections.OrderedDict)) and all(
-            map(ConstantVariable.is_literal, value.keys())
+            map(variables.is_literal, value.keys())
         ):
             guards = self.make_guards(GuardBuilder.DICT_KEYS)
             result = dict(
@@ -202,7 +202,7 @@ class VariableBuilder:
                     source=self.get_source(),
                     # Guards are added inside add_submodule
                 )
-        elif ConstantVariable.is_literal(value) or istype(
+        elif variables.is_literal(value) or istype(
             value, (torch.Size, torch.device, torch.dtype)
         ):
             # For these, just specialize on exact value
@@ -211,7 +211,7 @@ class VariableBuilder:
                 guards=make_guards(GuardBuilder.CONSTANT_MATCH),
             )
         elif isinstance(value, frozenset) and (
-            all(is_allowed(x) or ConstantVariable.is_literal(x) for x in value)
+            all(is_allowed(x) or variables.is_literal(x) for x in value)
         ):
             # For frozenset, we can guard by object ID instead of value
             # equality, this allows us to handle non-literal values

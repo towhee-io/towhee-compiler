@@ -328,9 +328,7 @@ class BuiltinVariable(VariableTracker):
             # convert min/max to torch ops
             if b.is_python_constant():
                 kwargs = {"min": b} if (self.fn is max) else {"max": b}
-                result = variables.torch(torch.clamp).call_function(
-                    tx, [a], kwargs
-                )
+                result = variables.torch(torch.clamp).call_function(tx, [a], kwargs)
             else:
                 fn = {max: torch.maximum, min: torch.minimum}[self.fn]
                 result = variables.torch(fn).call_function(tx, [a, b], {})
@@ -561,14 +559,12 @@ class BuiltinVariable(VariableTracker):
     def call_getattr(
         self, tx, obj: VariableTracker, name_var: VariableTracker, default=None
     ):
-        from . import ConstantVariable
         from . import GetAttrVariable
         from . import PythonModuleVariable
         from . import TorchVariable
         from . import UserFunctionVariable
-        from .builder import VariableBuilder
 
-        options = VariableTracker.propagate(self, obj, name_var)
+        options = variables.propagate(self, obj, name_var)
         guards = options["guards"]
         name = name_var.as_python_constant()
 
@@ -600,7 +596,7 @@ class BuiltinVariable(VariableTracker):
         elif isinstance(obj, variables.TensorVariable) and name == "grad":
             if source:
                 example_value = obj.proxy.node.meta["example_value"].grad
-                return VariableBuilder(tx, source)(example_value).add_options(options)
+                return variables.build(tx, source)(example_value).add_options(options)
             else:
                 unimplemented("tensor grad")
         elif isinstance(
@@ -626,10 +622,10 @@ class BuiltinVariable(VariableTracker):
             elif variables.is_literal(member):
                 return variables.constant(member, **options)
             else:
-                return VariableBuilder(tx, source)(member).add_guards(guards)
+                return variables.build(tx, source)(member).add_guards(guards)
         elif isinstance(obj, PythonModuleVariable):
             member = obj.value.__dict__[name]
-            return VariableBuilder(tx, source)(member).add_guards(guards)
+            return variables.build(tx, source)(member).add_guards(guards)
         elif istype(obj, UserFunctionVariable) and name in ("__name__", "__module__"):
             return variables.constant(
                 getattr(obj.fn, name), **VariableTracker.propagate(obj)
@@ -661,8 +657,6 @@ class BuiltinVariable(VariableTracker):
             obj.convert_to_unspecialized(tx)
 
     def call_type(self, tx, obj: VariableTracker):
-        from .builder import VariableBuilder
-
         try:
             py_type = obj.python_type()
         except NotImplementedError:
@@ -672,7 +666,7 @@ class BuiltinVariable(VariableTracker):
             return BuiltinVariable(py_type).add_options(self, obj)
 
         if py_type is not None and obj.source:
-            return VariableBuilder(tx, TypeSource(obj.source))(py_type).add_options(
+            return variables.build(tx, TypeSource(obj.source))(py_type).add_options(
                 self, obj
             )
 

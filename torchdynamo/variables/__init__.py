@@ -1,5 +1,8 @@
-from typing import Any, List
+from typing import Any
+from typing import List
+
 from .base import VariableTracker
+from .base import VariableTracker as Variable
 from .builtin import BuiltinVariable
 from .constant import ConstantVariable
 from .dicts import ConstDictVariable
@@ -40,11 +43,21 @@ from .user_defined import UserDefinedObjectVariable
 
 
 def is_literal(obj: Any) -> bool:
-    return ConstantVariable.is_literal(obj)
+    if type(obj) in (int, float, bool, type(None), str):
+        return True
+    if type(obj) in (list, tuple, set, frozenset):
+        return all(is_literal(x) for x in obj)
+    return False
 
 
 def propagate(*vars: List[List[VariableTracker]]):
     return VariableTracker.propagate(*vars)
+
+
+def build(*args, **kwargs):
+    from .builder import VariableBuilder
+
+    return VariableBuilder(*args, **kwargs)
 
 
 def constant(*args, **kwargs):
@@ -70,8 +83,10 @@ def constdict(*args, **kwargs):
 def userfunc(*args, **kwargs):
     return UserFunctionVariable(*args, **kwargs)
 
+
 def usermethod(*args, **kwargs):
     return UserMethodVariable(*args, **kwargs)
+
 
 def torch(*args, **kwargs):
     return TorchVariable(*args, **kwargs)
@@ -114,6 +129,7 @@ __all__ = [
     "UserDefinedObjectVariable",
     "UserFunctionVariable",
     "UserMethodVariable",
+    "Variable",
     "VariableTracker",
     "WithExitFunctionVariable",
 ]
