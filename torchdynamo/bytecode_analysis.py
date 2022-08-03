@@ -25,6 +25,7 @@ if sys.version_info < (3, 8):
             return 0
         return dis.stack_effect(opcode, arg)
 
+
 else:
     stack_effect = dis.stack_effect
 
@@ -94,10 +95,10 @@ def stacksize_analysis(instructions):
     assert instructions
     fixed_point = FixedPointBox()
     stack_sizes = {
-        inst: StackSize(float("inf"), float("-inf"), fixed_point)
+        id(inst): StackSize(float("inf"), float("-inf"), fixed_point)
         for inst in instructions
     }
-    stack_sizes[instructions[0]].zero()
+    stack_sizes[id(instructions[0])].zero()
 
     for _ in range(100):
         if fixed_point.value:
@@ -105,20 +106,20 @@ def stacksize_analysis(instructions):
         fixed_point.value = True
 
         for inst, next_inst in zip(instructions, instructions[1:] + [None]):
-            stack_size = stack_sizes[inst]
+            stack_size = stack_sizes[id(inst)]
             if inst.opcode not in TERMINAL_OPCODES:
                 assert next_inst is not None, f"missing next inst: {inst}"
-                stack_sizes[next_inst].offset_of(
+                stack_sizes[id(next_inst)].offset_of(
                     stack_size, stack_effect(inst.opcode, inst.arg, jump=False)
                 )
             if inst.opcode in JUMP_OPCODES:
-                stack_sizes[inst.target].offset_of(
+                stack_sizes[id(inst.target)].offset_of(
                     stack_size, stack_effect(inst.opcode, inst.arg, jump=True)
                 )
 
     if False:
         for inst in instructions:
-            stack_size = stack_sizes[inst]
+            stack_size = stack_sizes[id(inst)]
             print(stack_size.low, stack_size.high, inst)
 
     low = min([x.low for x in stack_sizes.values()])
