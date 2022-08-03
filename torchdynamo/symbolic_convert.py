@@ -9,12 +9,13 @@ import operator
 import sys
 import traceback
 import types
-from typing import Any, Sequence
+from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import Iterable
 from typing import List
 from typing import Optional
+from typing import Sequence
 from unittest.mock import patch
 
 import torch
@@ -32,6 +33,7 @@ from . import config
 from . import exc
 from . import skipfiles
 from . import variables
+from . import variables as vars
 from .allowed_functions import is_allowed
 from .allowed_functions import is_builtin
 from .bytecode_analysis import livevars_analysis
@@ -50,8 +52,8 @@ from .resume_execution import ReenterWith
 from .utils import counters
 from .utils import fake_tensors_available
 from .utils import istype
+from .variables import Variable
 from .variables.base import MutableLocal
-from .variables.base import VariableTracker
 from .variables.base import typestr
 from .variables.builtin import BuiltinVariable
 from .variables.constant import ConstantVariable
@@ -107,7 +109,7 @@ def stack_op(fn: Callable):
 
 def generic_jump(truth_fn: Callable, push: bool):
     def inner(self: "InstructionTranslatorBase", inst: Instruction):
-        value: VariableTracker = self.pop()
+        value: Variable = self.pop()
         self.output.guards.update(value.guards)
         if value.is_python_constant():
             if truth_fn(value.as_python_constant()):
@@ -211,25 +213,25 @@ class InstructionTranslatorBase(object):
     @typechecked
     def call_function(
         self,
-        fn: VariableTracker,
-        args: Sequence[VariableTracker],
-        kwargs: Dict[str, VariableTracker],
+        fn: Variable,
+        args: Sequence[Variable],
+        kwargs: Dict[str, Variable],
     ):
         self.push(fn.call_function(self, args, kwargs))
 
-    def update_locals_and_stack(self, oldvar: VariableTracker, newvar: VariableTracker):
-        def repl(v: VariableTracker):
+    def update_locals_and_stack(self, oldvar: Variable, newvar: Variable):
+        def repl(v: Variable):
             if v.mutable_local is oldvar.mutable_local:
                 return newvar
             return v
 
         cache = dict()
         self.output.side_effects.apply(repl, cache)
-        self.stack = [VariableTracker.apply(repl, x, cache) for x in self.stack]
+        self.stack = [Variable.apply(repl, x, cache) for x in self.stack]
         for k, x in self.symbolic_locals.items():
-            self.symbolic_locals[k] = VariableTracker.apply(repl, x, cache)
+            self.symbolic_locals[k] = Variable.apply(repl, x, cache)
 
-    def replace_all(self, oldvar: VariableTracker, newvar: VariableTracker):
+    def replace_all(self, oldvar: Variable, newvar: Variable):
         if isinstance(
             oldvar.mutable_local, torchdynamo.side_effects.MutableSideEffects
         ):
@@ -324,6 +326,7 @@ class InstructionTranslatorBase(object):
                     f"{self.lineno} {typestr(e)}: {e}\n"
                 )
                 import traceback
+
                 traceback.print_exc()
             raise
         finally:
@@ -336,10 +339,10 @@ class InstructionTranslatorBase(object):
                 self.output.cleanup()
 
     @typechecked
-    def push(self, val: Optional[VariableTracker]):
+    def push(self, val: Optional[Variable]):
         assert val is None or isinstance(
-            val, VariableTracker
-        ), f"push expects VariableTracker, got {typestr(val)}"
+            val, Variable
+        ), f"push expects Variable, got {typestr(val)}"
         self.stack.append(val)
 
     def push_many(self, vals: List[TensorVariable]):
@@ -500,7 +503,7 @@ class InstructionTranslatorBase(object):
             WithExitFunctionVariable(
                 ctx,
                 inst.target,
-                **VariableTracker.propagate(ctx),
+                **vars.propagate(ctx),
             )
         )
         self.push(ctx.enter(self))
@@ -544,7 +547,7 @@ class InstructionTranslatorBase(object):
 
     def COMPARE_OP(self, inst):
         left, right = self.popn(2)
-        options = VariableTracker.propagate([left, right])
+        options = vars.propagate([left, right])
         op = inst.argval
         supported_is_const = {
             "is": operator.is_,
@@ -727,22 +730,22 @@ class InstructionTranslatorBase(object):
 
     def BUILD_TUPLE(self, inst):
         items = self.popn(inst.argval)
-        options = VariableTracker.propagate(items)
+        options = vars.propagate(items)
         self.push(TupleVariable(items, **options))
 
     def BUILD_SLICE(self, inst):
         items = self.popn(inst.argval)
-        options = VariableTracker.propagate(items)
+        options = vars.propagate(items)
         self.push(SliceVariable(items, **options))
 
     def BUILD_LIST(self, inst):
         items = self.popn(inst.argval)
-        options = VariableTracker.propagate(items)
+        options = vars.propagate(items)
         self.push(ListVariable(items, mutable_local=MutableLocal(), **options))
 
     def BUILD_LIST_UNPACK(self, inst, cls=ListVariable):
         seqs = self.popn(inst.argval)
-        options = VariableTracker.propagate(seqs)
+        options = vars.propagate(seqs)
         items = list()
         for seq in seqs:
             try:
@@ -758,7 +761,7 @@ class InstructionTranslatorBase(object):
 
     def BUILD_MAP(self, inst):
         items = self.popn(inst.argval * 2)
-        options = VariableTracker.propagate(items)
+        options = vars.propagate(items)
         result = dict()
         for k, v in zip(items[::2], items[1::2]):
             assert isinstance(k, ConstantVariable)
@@ -771,7 +774,7 @@ class InstructionTranslatorBase(object):
     def BUILD_CONST_KEY_MAP(self, inst):
         keys = self.pop()
         values = self.popn(inst.argval)
-        options = VariableTracker.propagate([keys] + values)
+        options = vars.propagate([keys] + values)
         assert isinstance(keys, ConstantVariable)
         keys = keys.value
         assert istype(keys, tuple)
@@ -802,7 +805,7 @@ class InstructionTranslatorBase(object):
             variables.constdict(
                 items,
                 obj.user_cls,
-                **VariableTracker.propagate([obj, k, v]),
+                **vars.propagate([obj, k, v]),
             ),
         )
 
@@ -816,7 +819,7 @@ class InstructionTranslatorBase(object):
             obj,
             ListVariable(
                 obj.items + [v],
-                **VariableTracker.propagate([obj, v]),
+                **vars.propagate([obj, v]),
             ),
         )
 
@@ -839,7 +842,7 @@ class InstructionTranslatorBase(object):
         if flags & 0x01:
             defaults = self.pop()
 
-        options = VariableTracker.propagate(old_stack[len(self.stack) :])
+        options = vars.propagate(old_stack[len(self.stack) :])
         self.push(
             NestedUserFunctionVariable(
                 fn_name,
@@ -857,7 +860,7 @@ class InstructionTranslatorBase(object):
     def UNPACK_SEQUENCE(self, inst):
         # TODO(jansel): rewrite this using unpack_var_sequence
         seq = self.pop()
-        options = VariableTracker.propagate([seq])
+        options = vars.propagate([seq])
         if isinstance(seq, BaseListVariable):
             assert len(seq.items) == inst.argval
             self.output.guards.update(seq.guards)
@@ -885,7 +888,7 @@ class InstructionTranslatorBase(object):
         prefix = inst.argval & 0xFF  # low byte
         suffix = inst.argval >> 8  # high byte
         seq = self.pop()
-        options = VariableTracker.propagate(seq)
+        options = vars.propagate(seq)
         if seq.has_unpack_var_sequence(self):
             vals = list(seq.unpack_var_sequence(self))
             assert len(vals) >= prefix + suffix
@@ -1150,17 +1153,17 @@ class InstructionTranslatorBase(object):
         f_globals: Dict[str, Any],
         f_builtins: Dict[str, Any],
         code_options: Dict[str, Any],
-        symbolic_locals: Dict[str, VariableTracker],
-        symbolic_globals: Dict[str, VariableTracker],
+        symbolic_locals: Dict[str, Variable],
+        symbolic_globals: Dict[str, Variable],
         f_code: types.CodeType,
     ):
         super(InstructionTranslatorBase, self).__init__()
 
         # Mutable state checkpointed by copy_graphstate()
         self.output: OutputGraph = output
-        self.symbolic_locals: Dict[str, VariableTracker] = symbolic_locals
-        self.symbolic_globals: Dict[str, VariableTracker] = symbolic_globals
-        self.stack: List[VariableTracker] = []
+        self.symbolic_locals: Dict[str, Variable] = symbolic_locals
+        self.symbolic_globals: Dict[str, Variable] = symbolic_globals
+        self.stack: List[Variable] = []
         self.instruction_pointer: int = 0
         self.current_instruction: Instruction = create_instruction("NOP")
         self.next_instruction: Optional[Instruction] = None
@@ -1246,7 +1249,7 @@ class InstructionTranslator(InstructionTranslatorBase):
             if isinstance(
                 val, (ListIteratorVariable, BaseListVariable, ConstDictVariable)
             ):
-                local_guards = VariableTracker.propagate(val)["guards"]
+                local_guards = vars.propagate(val)["guards"]
                 index_guards = [
                     guard
                     for guard in local_guards
@@ -1358,7 +1361,7 @@ class InliningInstructionTranslator(InstructionTranslatorBase):
             unimplemented("arg mismatch inlining")
 
         for v in itertools.chain(sub_locals.values(), closure_cells.values()):
-            if not isinstance(v, VariableTracker):
+            if not isinstance(v, Variable):
                 unimplemented(f"unconverted arg {v}")
 
         code: types.CodeType = func.get_code()
@@ -1395,7 +1398,7 @@ class InliningInstructionTranslator(InstructionTranslatorBase):
             return ListIteratorVariable(
                 tracer.generated_items,
                 mutable_local=MutableLocal(),
-                **VariableTracker.propagate(tracer.symbolic_result),
+                **vars.propagate(tracer.symbolic_result),
             )
         else:
             return tracer.symbolic_result
@@ -1404,9 +1407,9 @@ class InliningInstructionTranslator(InstructionTranslatorBase):
         self,
         parent: InstructionTranslatorBase,
         code: types.CodeType,
-        symbolic_locals: Dict[str, VariableTracker],
-        symbolic_globals: Dict[str, VariableTracker],
-        closure_cells: Dict[str, VariableTracker],
+        symbolic_locals: Dict[str, Variable],
+        symbolic_globals: Dict[str, Variable],
+        closure_cells: Dict[str, Variable],
         funcvar: BaseUserFunctionVariable,
     ):
         f_globals = funcvar.get_globals()
@@ -1468,7 +1471,7 @@ class InliningInstructionTranslator(InstructionTranslatorBase):
         assert inst.argval in self.cell_and_freevars()
         self.push(self.closure_cells[inst.argval])
 
-    def replace_all(self, oldvar: VariableTracker, newvar: VariableTracker):
+    def replace_all(self, oldvar: Variable, newvar: Variable):
         newvar = super().replace_all(oldvar, newvar)
         # recursively check and update parent's locals and stack in case oldvar is from parent
         translator = self
