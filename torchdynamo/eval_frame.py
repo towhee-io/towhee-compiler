@@ -6,6 +6,7 @@ import warnings
 
 import torch
 
+import towhee
 from torchdynamo.utils import checkpoint_params
 from torchdynamo.utils import clone_inputs
 
@@ -346,6 +347,8 @@ class TorchPatcher:
 
         if proxy_tensor is not None:
             proxy_tensor.dispatch_trace = disable(proxy_tensor.dispatch_trace)
+
+        towhee.engine.factory.op = disable(towhee.engine.factory.op)
 
     @staticmethod
     def suppress_torch_distributed_warnings(fn):
