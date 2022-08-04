@@ -1,21 +1,23 @@
 import dis
 from typing import Any, Optional
+
 from recordclass import dataobject
+
 
 # @dataclass
 class Instruction(dataobject):
     """Mutable Instruction with acceleration and storage optimization
-    
+
     Examples:
-    
+
     1. create an instruction:
-    
+
     >>> inst = Instruction(0, "test_inst", None, 0)
     >>> inst
     Instruction(opcode=0, opname='test_inst', arg=None, argval=0, offset=None, starts_line=None, is_jump_target=False, target=None, argrepr=None)
-    
+
     2. the instruction object is mutable:
-    
+
     >>> inst.opcode = 1
     """
 
