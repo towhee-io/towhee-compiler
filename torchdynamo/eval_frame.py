@@ -5,6 +5,7 @@ import threading
 import warnings
 
 import torch
+import towhee
 from towhee.compiler.types import nothing
 
 from torchdynamo.utils import checkpoint_params
@@ -343,6 +344,8 @@ class TorchPatcher:
 
         if proxy_tensor is not None:
             proxy_tensor.dispatch_trace = disable(proxy_tensor.dispatch_trace)
+
+        towhee.engine.factory.op = disable(towhee.engine.factory.op)
 
     @staticmethod
     def suppress_torch_distributed_warnings(fn):
