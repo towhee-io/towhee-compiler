@@ -104,6 +104,7 @@ def run_one_model(
             logging.exception("unhandled error")
             logger.info("ERROR")
             return sys.exit(-1)
+        print(f"result(old vs new): {str(correct_result)[:40]} : {str(new_result)[:40]}")
         if not same(correct_result, new_result, False, tolerance):
             logger.info("INCORRECT when compre results.")
         ok, total = Stats.reset_counters()

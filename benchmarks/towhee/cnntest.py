@@ -7,40 +7,47 @@ import torchdynamo
 import numpy as np
 import nebullvm
 import towhee
+from towhee.compiler import jit_compile
 
 torchdynamo.config.debug = True
 # torchdynamo.config.trace = True
 
 torch_model = models.resnet50()
 torch_model = torch.nn.Sequential(*(list(torch_model.children())[:-1]))
-_ = torch_model.eval()
+torch_model = torch_model.eval()
 
 
-@torchdynamo.optimize('nebullvm')
-def image_embedding1(imgs):
+def image_embedding0(imgs):
     imgs = torch.tensor(imgs)
-#     imgs = torch.unsqueeze(imgs, 0)
     embedding = torch_model(imgs).detach().numpy()
     return embedding.reshape([2048])
 
+
+# @torchdynamo.optimize('nebullvm')
+def image_embedding1(imgs):
+    with jit_compile("nebullvm"):
+        # with torchdynamo.optimize('nebullvm'):
+        return image_embedding0(imgs)
 
 
 def test_cnn():
     inputs1 = np.random.randn(1, 3, 244, 244).astype(np.float32)
     inputs2 = np.random.randn(1, 3, 244, 244).astype(np.float32)
 
+    print("==== 1 ====")
     t1 = time.time()
     res1 = image_embedding1(inputs1)
-    print('1:', time.time()-t1, res1[0])
+    print("1:", time.time() - t1, str(res1)[:50])
 
+    print("==== 2 ====")
     t1 = time.time()
     res2 = image_embedding1(inputs1)
-    print('2:', time.time()-t1, res2[0])
+    print("2:", time.time() - t1, str(res2)[:50])
 
+    print("==== 3 ====")
     t1 = time.time()
-    embedding = torch_model(torch.tensor(inputs1)).detach().numpy()
-    res3 = embedding.reshape([2048])
-    print('ori:', time.time()-t1, res3[0])
+    res3 = image_embedding0(inputs1)
+    print("ori:", time.time() - t1, str(res3)[:50])
 
 
 test_cnn()
