@@ -329,20 +329,20 @@ class TorchPatcher:
     @functools.lru_cache(None)
     def patch():
         # Disable TorchDynamo on some torch.* compilers generated frames
-        torch.jit.trace = disable(torch.jit.trace)
-        torch.jit.trace_module = disable(torch.jit.trace_module)
-        torch.jit._get_trace_graph = disable(torch.jit._get_trace_graph)
+        torch.jit.trace = skip(torch.jit.trace)
+        torch.jit.trace_module = skip(torch.jit.trace_module)
+        torch.jit._get_trace_graph = skip(torch.jit._get_trace_graph)
 
         # symbolic_trace creates new frames. We disable Dynamo on such frames
-        torch.fx._symbolic_trace.Tracer.trace = disable(
+        torch.fx._symbolic_trace.Tracer.trace = skip(
             torch.fx._symbolic_trace.Tracer.trace
         )
 
-        torch.onnx.export_to_pretty_string = disable(torch.onnx.export_to_pretty_string)
+        torch.onnx.export_to_pretty_string = skip(torch.onnx.export_to_pretty_string)
         torch.distributions.Distribution.set_default_validate_args(False)
 
         if proxy_tensor is not None:
-            proxy_tensor.dispatch_trace = disable(proxy_tensor.dispatch_trace)
+            proxy_tensor.dispatch_trace = skip(proxy_tensor.dispatch_trace)
 
     @staticmethod
     def suppress_torch_distributed_warnings(fn):

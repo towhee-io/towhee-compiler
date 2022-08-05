@@ -15,8 +15,8 @@ class JITCompile:
         self._backend.__enter__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._params.__exit__(exc_type, exc_val, exc_tb)
         self._backend.__exit__(exc_type, exc_val, exc_tb)
+        self._params.__exit__(exc_type, exc_val, exc_tb)
 
 
 def jit_compile(*arg, **kws):
