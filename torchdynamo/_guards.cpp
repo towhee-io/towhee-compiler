@@ -27,9 +27,9 @@ public:
         dtype_(v.dtype().toScalarType()),
         requires_grad_(state.grad_mode_enabled && v.requires_grad()),
         dynamic_shapes_(dynamic_shapes) {
-    auto ndim = v.ndimension();
     const auto &sizes = v.sizes();
     const auto &strides = v.strides();
+    auto ndim = sizes.size();
     sizes_.reserve(ndim);
     strides_.reserve(ndim);
     for (int i = 0; i < ndim; ++i) {
