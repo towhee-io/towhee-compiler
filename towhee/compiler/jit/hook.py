@@ -1,16 +1,20 @@
 import threading
+from typing import Callable
 import warnings
 
 from towhee.compiler.jit import _eval_frame as _C
 
 from torchdynamo import config
-from torchdynamo import convert_frame
 from torchdynamo import skipfiles
+from torchdynamo.convert_frame import convert_frame_assert
+from torchdynamo.exc import BackendCompilerFailed
 
 safe_compile_lock = threading.Lock()
 
 
-def _make_safe_compile_fn(compile_fn):
+def _make_safe_frame_compile_fn(graph_compile_fn: Callable, guard_export_fn=None):
+    frame_compile_fn = convert_frame_assert(graph_compile_fn, guard_export_fn)
+
     def safe_compile_fn(frame, cache_size):
         try:
             if frame.f_lasti >= 0 or skipfiles.check(frame.f_code.co_filename):
@@ -24,10 +28,15 @@ def _make_safe_compile_fn(compile_fn):
                 # nametuple constructor
                 return None
             with safe_compile_lock:
-                return compile_fn(frame, cache_size)
+                return frame_compile_fn(frame, cache_size)
+        except BackendCompilerFailed as exc:
+            warnings.warn(
+                f"Error while processing frame {frame.f_code.co_name}@{frame.f_code.co_filename}:"
+                f"Exception stack: {exc}",
+            )
+            return None
         except Exception:
             warnings.warn(
-                "default",
                 f"Error while processing frame {frame.f_code.co_name}@{frame.f_code.co_filename}:",
             )
             return None
@@ -67,6 +76,5 @@ class CompilerContext:
 
 
 def compile(backend):
-    compile_fn = convert_frame.convert_frame(backend)
-    safe_compile_fn = _make_safe_compile_fn(compile_fn)
-    return CompilerContext(safe_compile_fn)
+    safe_frame_compile_fn = _make_safe_frame_compile_fn(backend)
+    return CompilerContext(safe_frame_compile_fn)
