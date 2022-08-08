@@ -9,7 +9,6 @@ import sys
 import time
 import warnings
 
-import numpy as np
 import pandas as pd
 import torch
 from towhee.compiler import jit_compile
@@ -104,7 +103,9 @@ def run_one_model(
             logging.exception("unhandled error")
             logger.info("ERROR")
             return sys.exit(-1)
-        print(f"result(old vs new): {str(correct_result)[:40]} : {str(new_result)[:40]}")
+        print(
+            f"result(old vs new): {str(correct_result)[:40]} : {str(new_result)[:40]}"
+        )
         if not same(correct_result, new_result, False, tolerance):
             logger.info("INCORRECT when compre results.")
         ok, total = Stats.reset_counters()
@@ -160,7 +161,7 @@ BLACKLIST = [
     "resnet50_quantized_qat",
     "tacotron2",
     "timm_efficientdet",
-    "vision_maskrcnn"
+    "vision_maskrcnn",
 ]
 
 
@@ -176,6 +177,9 @@ if __name__ == "__main__":
     parser.add_argument("-R", "--round", type=int, default=1)
     parser.add_argument("-Q", "--perf_loss_ths", type=float, default=None)
     parser.add_argument("-S", "--skip", type=str, default=None)
+    parser.add_argument("--feature", action="store_true")
+    parser.add_argument("--no-feature", dest="feature", action="store_false")
+    parser.set_defaults(feature=False)
     args = parser.parse_args()
 
     original_dir = os.path.abspath(os.getcwd())
@@ -210,7 +214,8 @@ if __name__ == "__main__":
         args.model_name = model_name
 
         optimize_ctx = jit_compile(
-            backend=args.backend, perf_loss_ths=args.perf_loss_ths
+            backend=args.backend, feature=args.feature, perf_loss_ths=args.perf_loss_ths
         )
+
         name, model, example_input = load_model(args)
         logger.info(run_one_model(args, model, example_input, optimize_ctx))
