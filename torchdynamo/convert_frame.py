@@ -309,16 +309,15 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
             if config.debug or config.trace or config.print_internal_exceptions:
                 debug_print("WONT CONVERT")
                 warnings.warn(
-                    "default", "=" * 10 + " TorchDynamo Stack Trace " + "=" * 10 + "\n"
+                    "=" * 10 + " TorchDynamo Stack Trace " + "=" * 10 + "\n"
                 )
                 traceback.print_exc()
                 warnings.warn(
-                    "default",
                     "=" * 10 + " Exception (above) while processing " + "=" * 10 + "\n",
                 )
                 traceback.print_stack(frame)
                 warnings.warn(
-                    "default", "=" * 10 + " End debug info " + "=" * 10 + "\n"
+                    "=" * 10 + " End debug info " + "=" * 10 + "\n"
                 )
             raise InternalTorchDynamoError()
 
