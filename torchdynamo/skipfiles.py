@@ -164,6 +164,8 @@ for _name in (
     "fx2trt_oss",
     "xarray",
     "towhee",
+    "PIL",
+    "cv2"
 ):
     add(_name)
 
