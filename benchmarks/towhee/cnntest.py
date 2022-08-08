@@ -8,6 +8,11 @@ import numpy as np
 import nebullvm
 import towhee
 from towhee.compiler import jit_compile
+from towhee.compiler import set_log_level, get_logger
+
+set_log_level("info")
+
+log = get_logger(__name__)
 
 torchdynamo.config.debug = True
 # torchdynamo.config.trace = True
@@ -25,7 +30,7 @@ def image_embedding0(imgs):
 
 # @torchdynamo.optimize('nebullvm')
 def image_embedding1(imgs):
-    with jit_compile("nebullvm"):
+    with jit_compile("nebullvm", feature=True):
         # with torchdynamo.optimize('nebullvm'):
         return image_embedding0(imgs)
 

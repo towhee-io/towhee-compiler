@@ -1,13 +1,15 @@
 import threading
 from typing import Callable
-import warnings
 
 from towhee.compiler.jit import _eval_frame as _C
 
-from torchdynamo import config
 from torchdynamo import skipfiles
 from torchdynamo.convert_frame import convert_frame_assert
 from torchdynamo.exc import BackendCompilerFailed
+
+from ..log import get_logger
+
+log = get_logger(__name__)
 
 safe_compile_lock = threading.Lock()
 
@@ -18,8 +20,7 @@ def _make_safe_frame_compile_fn(graph_compile_fn: Callable, guard_export_fn=None
     def safe_compile_fn(frame, cache_size):
         try:
             if frame.f_lasti >= 0 or skipfiles.check(frame.f_code.co_filename):
-                if config.debug:
-                    print(f"skipping {frame.f_code.co_name} {frame.f_code.co_filename}")
+                log.debug(f"skipping {frame.f_code.co_name} {frame.f_code.co_filename}")
                 return None
             if (
                 frame.f_code.co_filename == "<string>"
@@ -30,13 +31,13 @@ def _make_safe_frame_compile_fn(graph_compile_fn: Callable, guard_export_fn=None
             with safe_compile_lock:
                 return frame_compile_fn(frame, cache_size)
         except BackendCompilerFailed as exc:
-            warnings.warn(
+            log.warn(
                 f"Error while processing frame {frame.f_code.co_name}@{frame.f_code.co_filename}:"
                 f"Exception stack: {exc}",
             )
             return None
         except Exception:
-            warnings.warn(
+            log.warn(
                 f"Error while processing frame {frame.f_code.co_name}@{frame.f_code.co_filename}:",
             )
             return None
@@ -52,7 +53,7 @@ class CompilerContext:
 
         self.prior = None
         self.extra_ctx = extra_ctx
-        print(f"==== using new towhee compile decorator ====")
+        log.info(f"==== using new towhee compile decorator ====")
 
     def __enter__(self):
         if self.extra_ctx:
