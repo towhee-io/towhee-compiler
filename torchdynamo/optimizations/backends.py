@@ -119,14 +119,13 @@ def nebullvm(subgraph):
     inputs = subgraph.example_inputs
     hash_path = subgraph.hash_path
     cached_model_dir = Path(cached_dir) / hash_path
-    str_cached_model_dir = str(cached_model_dir)
+    str_cached_model_dir = str(cached_model_dir.absolute())
 
     from towhee.functional import param_scope
     with param_scope() as ps:
 <<<<<<< HEAD
         if cached_model_dir.exists():
-            if debug:
-                print(f"Found the cached model in ", str_cached_model_dir)
+            print(f"using cached model in {str_cached_model_dir}")
             return PytorchONNXInferenceLearner.load(str_cached_model_dir)
         else:
 <<<<<<< HEAD
@@ -157,7 +156,7 @@ def nebullvm(subgraph):
 =======
             try:
                 if debug:
-                    print(f"Saving the model to ", str_cached_model_dir)
+                    print(f"Saving the model to {str_cached_model_dir}")
                 cached_model_dir.mkdir(parents=True)
                 return optimize_torch_model(
                     model=model,
