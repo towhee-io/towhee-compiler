@@ -5,6 +5,7 @@ import threading
 import warnings
 
 import torch
+import torchvision
 import towhee
 from towhee.compiler.types import nothing
 
@@ -346,6 +347,8 @@ class TorchPatcher:
             proxy_tensor.dispatch_trace = skip(proxy_tensor.dispatch_trace)
 
         towhee.engine.factory.op = disable(towhee.engine.factory.op)
+
+        torchvision.transforms.Compose.__call__ = disable(torchvision.transforms.Compose.__call__)
 
     @staticmethod
     def suppress_torch_distributed_warnings(fn):

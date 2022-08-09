@@ -2,3 +2,4 @@ numpy
 recordclass
 tabulate
 torch
+typeguard
