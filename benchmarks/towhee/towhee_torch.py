@@ -12,6 +12,7 @@ import warnings
 import pandas as pd
 import torch
 from towhee.compiler import jit_compile
+from towhee.compiler import set_log_level
 
 import torchdynamo
 from torchdynamo.testing import same
@@ -180,14 +181,16 @@ if __name__ == "__main__":
     parser.add_argument("--feature", action="store_true", help="use towhee compiler decorator")
     parser.add_argument("--no-feature", dest="feature", action="store_false", help="use torchdynamo decorator")
     parser.set_defaults(feature=False)
+    parser.add_argument("-l", "--log", type=str, default="info", help="log level")
     args = parser.parse_args()
+
+    set_log_level(args.log)
 
     original_dir = os.path.abspath(os.getcwd())
     torchbench_dir = os.path.abspath(args.path)
     os.chdir(torchbench_dir)
     sys.path.append(torchbench_dir)
 
-    logging.basicConfig(level=logging.WARNING)
     warnings.filterwarnings("ignore")
 
     if isinstance(args.model_name, str):
