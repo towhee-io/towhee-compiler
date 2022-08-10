@@ -18,8 +18,8 @@ def inner_distance(query, data):
     return dists
 
 
-data = [numpy.random.random((100, 8096)) for _ in range(10)]
-query = numpy.random.random(8096)
+data = [numpy.random.random((10000, 128)) for _ in range(10)]
+query = numpy.random.random(128)
 
 t1 = time.time()
 dc1 = (
@@ -35,6 +35,5 @@ dc2 = (
     .inner_distance[('b', 'a'), 'c']()
 )
 t3 = time.time()
-print('time:', t3-t2, t2-t1)
-# print('time:', t3-t2, t2-t1, '\n', dc1[0].c, '\n', dc2[0].c)
-# assert(t3-t2 < t2-t1)
+print('time:', t3-t2, t2-t1, '\n', dc1[0].c[0:2], '\n', dc2[0].c[0:2])
+assert(t3-t2 < t2-t1)

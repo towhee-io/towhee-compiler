@@ -29,7 +29,6 @@
   } else {                                                                     \
   }
 
-#define TORCHDYNAMO_DEBUG
 #ifdef TORCHDYNAMO_DEBUG
 
 #define DEBUG_CHECK(cond) CHECK(cond)
@@ -140,6 +139,22 @@ static inline PyObject *call_callback(PyObject *callable, PyObject *frame,
   PyObject *result = PyObject_CallObject(callable, args);
   Py_DECREF(args);
   return result;
+}
+
+static inline PyObject *call_func(PyObject *callable, PyObject *f_locals) {
+    PyObject *dotzero = PyDict_GetItem(f_locals, dotzerokey);
+    PyObject *result = NULL;
+    if (unlikely(dotzero != NULL)) {
+      // .0 is a special variable name used for implicit args
+      PyObject *args = PyTuple_Pack(1, dotzero);
+      NULL_CHECK(args);
+      result = PyObject_Call(callable, args, f_locals);
+      Py_DECREF(args);
+    } else {
+      result = PyObject_Call(callable, noargs, f_locals);
+    }
+    NULL_CHECK(result);
+    return result;
 }
 
 typedef struct cache_entry {
@@ -263,8 +278,8 @@ inline static PyObject *eval_custom_code(PyThreadState *tstate,
   DEBUG_NULL_CHECK(frame);
   DEBUG_NULL_CHECK(code);
   DEBUG_CHECK(ncells == PyTuple_GET_SIZE(frame->f_code->co_cellvars));
-//  DEBUG_CHECK(nfrees == PyTuple_GET_SIZE(frame->f_code->co_freevars));
-//  DEBUG_CHECK(nlocals_new >= nlocals_old);
+  DEBUG_CHECK(nfrees == PyTuple_GET_SIZE(frame->f_code->co_freevars));
+  DEBUG_CHECK(nlocals_new >= nlocals_old);
 
   PyFrameObject *shadow = PyFrame_New(tstate, code, frame->f_globals, NULL);
   if (shadow == NULL) {
@@ -353,6 +368,9 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate, PyFrameObject *frame,
     DEBUG_TRACE("cache hit %s", name(frame));
     // Re-enable custom behavior
     eval_frame_callback_set(callback);
+    if (extra->check_fn == Py_None) {
+      return call_func(cached_code, frame->f_locals);
+    }
     return eval_custom_code(tstate, frame, cached_code, throw_flag);
   }
   // cache miss
@@ -365,23 +383,17 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate, PyFrameObject *frame,
     // testing
     return NULL;
   } else if (result != Py_None) {
-//    PyObject *result_code = PyObject_GetAttrString(result, "check_fn");
-//    if (result_code == Py_None) {
-//        DEBUG_TRACE("result check_fn is None: %s", name(frame));
-//        DEBUG_TRACE("create skip %s", name(frame));
-//        Py_DECREF(result);
-//        destroy_cache_entry(extra);
-//        set_extra(frame->f_code, SKIP_CODE);
-//        // Re-enable custom behavior
-//        eval_frame_callback_set(callback);
-//        return eval_frame_default(tstate, frame, throw_flag);
-//    }
+    PyObject *result_check_fn = PyObject_GetAttrString(result, "check_fn");
     DEBUG_TRACE("create cache %s", name(frame));
     extra = create_cache_entry(extra, result);
-    Py_DECREF(result);
     set_extra(frame->f_code, extra);
     // Re-enable custom behavior
     eval_frame_callback_set(callback);
+    if (result_check_fn == Py_None) {
+      DEBUG_TRACE("result check_fn is None: %s", name(frame));
+      return call_func(result, frame->f_locals);
+    }
+    Py_DECREF(result);
     return eval_custom_code(tstate, frame, extra->code, throw_flag);
   } else {
     DEBUG_TRACE("create skip %s", name(frame));

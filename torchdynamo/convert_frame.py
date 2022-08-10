@@ -1,6 +1,5 @@
 import dis
 import functools
-import time
 import traceback
 import types
 import typing
@@ -236,19 +235,13 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
             if frame.f_code.co_name in ['__exit__', 'nothing', '<lambda>']:
                 return None
             import numba
-            import numpy
 
             def tmp_func(): pass
             tmp_func.__code__ = frame.f_code
 
-            # def compiled_numba_func1(*args, **kws):
-            #     return numba.njit(tmp_func)(*args, **kws)
             try:
                 numba_tmp_func = numba.njit(tmp_func)
-
-                # data = numpy.random.random((1, 8096))
-                # query = numpy.random.random(8096)
-                # _ = numba_tmp_func(query, data)
+                _ = numba_tmp_func(**frame.f_locals)
 
                 def compiled_numba_func(*args, **kws):
                     res = numba_tmp_func(*args, **kws)
@@ -257,15 +250,7 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
                 numba_func = torchdynamo.disable(compiled_numba_func)
 
                 numba_func.check_fn = None
-                numba_func.code = numba_func.__code__
-                # frame.f_code = numba_func.__code__
-                print(numba_func.code.co_nlocals, frame.f_code.co_nlocals)
-                print(numba_func.code.co_freevars, frame.f_code.co_freevars)
-                print(numba_func.code.co_freevars, frame.f_code.co_freevars)
-                # numba_func.code.co_nlocals = tmp_func.__code__.co_nlocals
-                # numba_func.code.co_flags = tmp_func.__code__.co_flags
-                # numba_func.code.co_freevars += tmp_func.__code__.co_freevars
-                # numba_func.code.co_cellvars = tmp_func.__code__.co_cellvars
+                numba_func.code = numba_func
                 return numba_func
             except:
                 return None
