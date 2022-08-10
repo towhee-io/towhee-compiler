@@ -29,7 +29,7 @@
   } else {                                                                     \
   }
 
-//#define TORCHDYNAMO_DEBUG
+#define TORCHDYNAMO_DEBUG
 #ifdef TORCHDYNAMO_DEBUG
 
 #define DEBUG_CHECK(cond) CHECK(cond)
@@ -263,8 +263,8 @@ inline static PyObject *eval_custom_code(PyThreadState *tstate,
   DEBUG_NULL_CHECK(frame);
   DEBUG_NULL_CHECK(code);
   DEBUG_CHECK(ncells == PyTuple_GET_SIZE(frame->f_code->co_cellvars));
-  DEBUG_CHECK(nfrees == PyTuple_GET_SIZE(frame->f_code->co_freevars));
-  DEBUG_CHECK(nlocals_new >= nlocals_old);
+//  DEBUG_CHECK(nfrees == PyTuple_GET_SIZE(frame->f_code->co_freevars));
+//  DEBUG_CHECK(nlocals_new >= nlocals_old);
 
   PyFrameObject *shadow = PyFrame_New(tstate, code, frame->f_globals, NULL);
   if (shadow == NULL) {
@@ -284,7 +284,9 @@ inline static PyObject *eval_custom_code(PyThreadState *tstate,
     fastlocals_new[nlocals_new + i] = fastlocals_old[nlocals_old + i];
   }
 
+  DEBUG_TRACE0("eval_frame_default 1");
   PyObject *result = eval_frame_default(tstate, shadow, throw_flag);
+  DEBUG_TRACE0("eval_frame_default 2");
   Py_DECREF(shadow);
   return result;
 }
@@ -363,10 +365,16 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate, PyFrameObject *frame,
     // testing
     return NULL;
   } else if (result != Py_None) {
-//    PyObject *result_code = PyObject_GetAttrString(result, "code");
+//    PyObject *result_code = PyObject_GetAttrString(result, "check_fn");
 //    if (result_code == Py_None) {
-//        DEBUG_TRACE("result code is None: %s", name(frame));
-//        return result;
+//        DEBUG_TRACE("result check_fn is None: %s", name(frame));
+//        DEBUG_TRACE("create skip %s", name(frame));
+//        Py_DECREF(result);
+//        destroy_cache_entry(extra);
+//        set_extra(frame->f_code, SKIP_CODE);
+//        // Re-enable custom behavior
+//        eval_frame_callback_set(callback);
+//        return eval_frame_default(tstate, frame, throw_flag);
 //    }
     DEBUG_TRACE("create cache %s", name(frame));
     extra = create_cache_entry(extra, result);
