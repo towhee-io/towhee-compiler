@@ -231,7 +231,26 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
         output = None
 
         if not has_tensor_in_frame(frame):
-            return None
+            if frame.f_code.co_name in ['__exit__', 'nothing', '<lambda>']:
+                return None
+            import numba
+            import numpy
+
+            def tmp_func(): pass
+            tmp_func.__code__ = frame.f_code
+            try:
+                numba_func = numba.njit(tmp_func)
+
+                # data = numpy.random.random((1, 8096))
+                # query = numpy.random.random(8096)
+                # _ = numba_func(query, data)
+
+                numba_func.check_fn = None
+                # numba_func.code = None
+                numba_func.code = numba_func.__code__
+                return numba_func
+            except:
+                return None
 
         # from .utils import print_once;  print_once(code.co_filename)
 

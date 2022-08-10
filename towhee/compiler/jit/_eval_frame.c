@@ -29,6 +29,7 @@
   } else {                                                                     \
   }
 
+//#define TORCHDYNAMO_DEBUG
 #ifdef TORCHDYNAMO_DEBUG
 
 #define DEBUG_CHECK(cond) CHECK(cond)
@@ -195,6 +196,10 @@ static PyCodeObject *lookup(CacheEntry *e, PyObject *f_locals) {
   if (e == NULL) {
     return NULL;
   }
+  if (e->check_fn == Py_None) {
+    DEBUG_TRACE0("check_fn is None, will RETURN e->code");
+    return e->code;
+  }
   PyObject *dotzero = PyDict_GetItem(f_locals, dotzerokey);
   PyObject *valid = NULL;
   if (unlikely(dotzero != NULL)) {
@@ -358,6 +363,11 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate, PyFrameObject *frame,
     // testing
     return NULL;
   } else if (result != Py_None) {
+//    PyObject *result_code = PyObject_GetAttrString(result, "code");
+//    if (result_code == Py_None) {
+//        DEBUG_TRACE("result code is None: %s", name(frame));
+//        return result;
+//    }
     DEBUG_TRACE("create cache %s", name(frame));
     extra = create_cache_entry(extra, result);
     Py_DECREF(result);
