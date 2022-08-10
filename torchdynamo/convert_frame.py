@@ -242,12 +242,7 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
             try:
                 numba_tmp_func = numba.njit(tmp_func)
                 _ = numba_tmp_func(**frame.f_locals)
-
-                def compiled_numba_func(*args, **kws):
-                    res = numba_tmp_func(*args, **kws)
-                    return res
-
-                numba_func = torchdynamo.disable(compiled_numba_func)
+                numba_func = torchdynamo.disable(numba_tmp_func)
 
                 numba_func.check_fn = None
                 numba_func.code = numba_func
