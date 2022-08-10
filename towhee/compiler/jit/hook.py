@@ -6,6 +6,7 @@ from towhee.compiler.jit import _eval_frame as _C
 from torchdynamo import skipfiles
 from torchdynamo.convert_frame import convert_frame_assert
 from torchdynamo.exc import BackendCompilerFailed
+from towhee.compiler.backends.torch_frame_compiler import TorchFrameCompiler
 
 from ..log import get_logger
 
@@ -15,7 +16,8 @@ safe_compile_lock = threading.Lock()
 
 
 def _make_safe_frame_compile_fn(graph_compile_fn: Callable, guard_export_fn=None):
-    frame_compile_fn = convert_frame_assert(graph_compile_fn, guard_export_fn)
+    # frame_compile_fn = convert_frame_assert(graph_compile_fn, guard_export_fn)
+    frame_compile_fn = TorchFrameCompiler(graph_compile_fn, one_graph=True)
 
     def safe_compile_fn(frame, cache_size):
         try:
@@ -36,10 +38,11 @@ def _make_safe_frame_compile_fn(graph_compile_fn: Callable, guard_export_fn=None
                 f"Exception stack: {exc}",
             )
             return None
-        except Exception:
+        except Exception as exc:
             log.warn(
                 f"Error while processing frame {frame.f_code.co_name}@{frame.f_code.co_filename}:",
             )
+            log.warn(f"{exc}")
             return None
 
     return safe_compile_fn

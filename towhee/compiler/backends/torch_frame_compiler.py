@@ -50,15 +50,13 @@ def debug_print(prefix: str, frame: FrameType):
 
 
 class TorchFrameCompiler(FrameCompiler):
-    def __init__(
-        self, graph_compile_fn: Callable, one_graph: bool, cache_size: int
-    ) -> None:
-        super().__init__(cache_size)
+    def __init__(self, graph_compile_fn: Callable, one_graph: bool) -> None:
+        super().__init__()
         self.graph_compile_fn = wrap_compiler_fn(graph_compile_fn)
         self.one_graph = one_graph
 
-    def __call__(self, frame: FrameType) -> GuardedCode:
-        if not self.check_cache(frame):
+    def __call__(self, frame: FrameType, cache_size: int) -> GuardedCode:
+        if not self.check_cache(frame, cache_size):
             return None
         try:
             return self.compile(frame)
@@ -78,8 +76,8 @@ class TorchFrameCompiler(FrameCompiler):
                 warnings.warn("=" * 10 + " End debug info " + "=" * 10 + "\n")
             raise InternalTorchDynamoError()
 
-    def check_cache(self, frame: FrameType) -> bool:
-        FrameCompiler.add(frame.f_code)
+    def check_cache(self, frame: FrameType, cache_size: int) -> bool:
+        FrameCompiler.input_codes.add(frame.f_code)
         if frame.f_code in FrameCompiler.output_codes:
             return False
         if frame.f_code.co_name == "__setattr__":
