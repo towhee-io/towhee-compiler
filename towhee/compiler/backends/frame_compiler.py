@@ -21,8 +21,8 @@ class FrameCompiler:
     input_codes = _Tracker()
     output_codes = _Tracker()
 
-    def __init__(self, cache_size: int) -> None:
+    def __init__(self) -> None:
         pass
 
-    def __call__(self, frame: FrameType) -> GuardedCode:
+    def __call__(self, frame: FrameType, cache_size: int) -> GuardedCode:
         pass
