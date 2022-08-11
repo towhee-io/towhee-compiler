@@ -31,7 +31,7 @@ from torchdynamo.symbolic_convert import InstructionTranslator
 from torchdynamo.utils import CleanupManager
 from torchdynamo.utils import ExactWeakKeyDictionary
 
-from .frame_compiler import FrameCompiler
+from .frame_compiler import FrameCompiler, numba_compile
 
 orig_code_map = ExactWeakKeyDictionary()
 
@@ -58,6 +58,8 @@ class TorchFrameCompiler(FrameCompiler):
     def __call__(self, frame: FrameType, cache_size: int) -> GuardedCode:
         if not self.check_cache(frame, cache_size):
             return None
+        if not has_tensor_in_frame(frame):
+            return numba_compile(frame)
         try:
             return self.compile(frame)
         except (Unsupported, TorchRuntimeError, BackendCompilerFailed):
@@ -95,9 +97,6 @@ class TorchFrameCompiler(FrameCompiler):
             return False
         if is_generator(frame.f_code):
             raise Unsupported("generator is not supported by towhee.compiler")
-
-        if not has_tensor_in_frame(frame):
-            return False
         return True
 
     def transform(self, frame: FrameType, instructions, code_options):
