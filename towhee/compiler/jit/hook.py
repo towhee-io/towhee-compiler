@@ -6,7 +6,7 @@ from towhee.compiler.jit import _eval_frame as _C
 from torchdynamo import skipfiles
 from torchdynamo.convert_frame import convert_frame_assert
 from torchdynamo.exc import BackendCompilerFailed
-from towhee.compiler.backends.torch_frame_compiler import TorchFrameCompiler
+from towhee.compiler.frontends.torch_frame_compiler import TorchFrameCompiler
 
 from ..log import get_logger
 

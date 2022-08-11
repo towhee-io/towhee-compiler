@@ -195,6 +195,10 @@ static PyCodeObject *lookup(CacheEntry *e, PyObject *f_locals) {
   if (e == NULL) {
     return NULL;
   }
+  if (e->check_fn == Py_None) {
+    DEBUG_TRACE0("check_fn is None, will RETURN e->code");
+    return e->code;
+  }
   PyObject *dotzero = PyDict_GetItem(f_locals, dotzerokey);
   PyObject *valid = NULL;
   if (unlikely(dotzero != NULL)) {
