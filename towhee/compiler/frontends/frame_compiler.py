@@ -12,7 +12,6 @@ def numba_compile(frame):
     import numba
 
     frame_name = frame.f_code.co_name
-    print('numba compile:', frame_name)
     if frame_name in ['__exit__', 'nothing', '<lambda>']:
         return None
 
