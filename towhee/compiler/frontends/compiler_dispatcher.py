@@ -2,6 +2,7 @@ from types import FrameType
 from typing import Callable
 
 from torchdynamo.convert_frame import has_tensor_in_frame
+from torchdynamo.guards import GuardedCode
 
 from .frame_compiler import FrameCompiler
 from .numba_frame_compiler import NumbaFrameCompiler
@@ -18,5 +19,5 @@ class CompilerDispatcher(FrameCompiler):
         if not self.check_cache(frame, cache_size):
             return None
         if not has_tensor_in_frame(frame):
-            return self._numba(frame)
-        return self._torch.call(frame, cache_size)
+            return self._numba(frame, cache_size)
+        return self._torch.call(frame)
