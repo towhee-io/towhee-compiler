@@ -4,10 +4,9 @@ from typing import Callable
 from towhee.compiler.jit import _eval_frame as _C
 
 from torchdynamo import skipfiles
-from torchdynamo.convert_frame import convert_frame_assert
 from torchdynamo.exc import BackendCompilerFailed
-from towhee.compiler.frontends.torch_frame_compiler import TorchFrameCompiler
 
+from ..frontends.compiler_dispatcher import CompilerDispatcher
 from ..log import get_logger
 
 log = get_logger(__name__)
@@ -17,7 +16,7 @@ safe_compile_lock = threading.Lock()
 
 def _make_safe_frame_compile_fn(graph_compile_fn: Callable, guard_export_fn=None):
     # frame_compile_fn = convert_frame_assert(graph_compile_fn, guard_export_fn)
-    frame_compile_fn = TorchFrameCompiler(graph_compile_fn, one_graph=True)
+    frame_compile_fn = CompilerDispatcher(graph_compile_fn, one_graph=True)
 
     def safe_compile_fn(frame, cache_size):
         try:

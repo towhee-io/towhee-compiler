@@ -50,5 +50,5 @@ class NumbaFrameCompiler(FrameCompiler):
     def __init__(self) -> None:
         super().__init__()
 
-    def __call__(self, frame: FrameType, cache_size: int) -> GuardedCode:
+    def __call__(self, frame: FrameType, cache_size: int = None) -> GuardedCode:
         return numba_compile(frame)
