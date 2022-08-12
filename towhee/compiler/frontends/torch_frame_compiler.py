@@ -14,7 +14,6 @@ from torchdynamo.bytecode_transformation import cleaned_instructions
 from torchdynamo.bytecode_transformation import devirtualize_jumps
 from torchdynamo.bytecode_transformation import fix_extended_args
 from torchdynamo.bytecode_transformation import fix_vars
-from torchdynamo.bytecode_transformation import is_generator
 from torchdynamo.bytecode_transformation import stacksize_analysis
 from torchdynamo.bytecode_transformation import update_offsets
 from torchdynamo.convert_frame import has_tensor_in_frame
@@ -31,7 +30,8 @@ from torchdynamo.symbolic_convert import InstructionTranslator
 from torchdynamo.utils import CleanupManager
 from torchdynamo.utils import ExactWeakKeyDictionary
 
-from .frame_compiler import FrameCompiler, numba_compile
+from .frame_compiler import FrameCompiler
+from .numba_frame_compiler import numba_compile
 
 orig_code_map = ExactWeakKeyDictionary()
 
@@ -60,6 +60,9 @@ class TorchFrameCompiler(FrameCompiler):
             return None
         if not has_tensor_in_frame(frame):
             return numba_compile(frame)
+        return self.call(frame)
+
+    def call(self, frame: FrameType) -> GuardedCode:
         try:
             return self.compile(frame)
         except (Unsupported, TorchRuntimeError, BackendCompilerFailed):
@@ -77,27 +80,6 @@ class TorchFrameCompiler(FrameCompiler):
                 traceback.print_stack(frame)
                 warnings.warn("=" * 10 + " End debug info " + "=" * 10 + "\n")
             raise InternalTorchDynamoError()
-
-    def check_cache(self, frame: FrameType, cache_size: int) -> bool:
-        FrameCompiler.input_codes.add(frame.f_code)
-        if frame.f_code in FrameCompiler.output_codes:
-            return False
-        if frame.f_code.co_name == "__setattr__":
-            return False
-        if (
-            frame.f_code.co_name == "<module>"
-            and frame.f_code.co_filename == "<string>"
-        ):
-            return False
-        if (
-            frame.f_code.co_name == "<lambda>"
-            and frame.f_code.co_filename == "<string>"
-            and not bool(frame.f_builtins)
-        ):
-            return False
-        if is_generator(frame.f_code):
-            raise Unsupported("generator is not supported by towhee.compiler")
-        return True
 
     def transform(self, frame: FrameType, instructions, code_options):
         tracer = InstructionTranslator(
