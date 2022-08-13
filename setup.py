@@ -8,7 +8,7 @@ long_description = """
 Towhee compiler is a Python JIT compiler that
 speeds up AI-related codes by native code generation.
 The project is inspired by [Numba](https://github.com/numba/numba),
-[Pyjion](https://www.trypyjion.com) and [TorchDynamo]().
+[Pyjion](https://www.trypyjion.com) and [TorchDynamo](https://github.com/pytorch/torchdynamo).
 Towhee compiler uses a frame evaluation hook (see [PEP 523]: https://www.python.org/dev/peps/pep-0523/)
 to get the chance of compiling python bytecodes into native code.
 """
@@ -17,11 +17,11 @@ setup(
     name="towhee.compiler",
     version="0.1.0",
     url="https://github.com/towhee-io/towhee-compiler",
-    description="A Python-level JIT compiler designed to make unmodified PyTorch programs faster.",
+    description="A JIT compiler for accelerating AI programs written in python.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="Jason Ansel",
-    author_email="jansel@fb.com",
+    author='Towhee Team',
+    author_email='towhee-team@zilliz.com',
     license="BSD-3",
     keywords="pytorch machine learning compilers",
     python_requires=">=3.7, <3.11",

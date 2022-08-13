@@ -20,6 +20,11 @@ def inner_distance(query, data):
 
 
 class TestNumbaFrontend(TestCase):
+    # TODO: add unit test for function with kwargs
+    # TODO: add unit test for function with args and kwargs
+    # TODO: add unit test for instance method
+    # TODO: add unit test for class method
+    # TODO: add unit test for static method
     def setUp(self) -> None:
         self.data = [np.random.random((10000, 128)) for _ in range(10)]
         self.query = np.random.random(128)
