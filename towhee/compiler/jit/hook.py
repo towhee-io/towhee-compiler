@@ -55,7 +55,7 @@ class CompilerContext:
 
         self.prior = None
         self.extra_ctx = extra_ctx
-        log.info(f"==== using new towhee compile decorator ====")
+        # log.info(f"==== using new towhee compile decorator ====")
 
     def __enter__(self):
         if self.extra_ctx:
