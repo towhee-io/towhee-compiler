@@ -67,11 +67,11 @@ class TorchFrameCompiler(FrameCompiler):
             return self.compile(frame)
         except (Unsupported, TorchRuntimeError, BackendCompilerFailed):
             if config.debug or config.trace or config.print_internal_exceptions:
-                debug_print("WONT CONVERT")
+                debug_print("WONT CONVERT", frame)
             raise
         except Exception:
             if config.debug or config.trace or config.print_internal_exceptions:
-                debug_print("WONT CONVERT")
+                debug_print("WONT CONVERT", frame)
                 warnings.warn("=" * 10 + " TorchDynamo Stack Trace " + "=" * 10 + "\n")
                 traceback.print_exc()
                 warnings.warn(
