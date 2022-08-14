@@ -57,8 +57,8 @@ class TestNumbaFrontend(TestCase):
     # TODO: add unit test for class method
     # DONE: add unit test for static method
     def setUp(self) -> None:
-        self.data = [np.random.random((10000, 128)) for _ in range(10)]
-        self.query = np.random.random(128)
+        self.data = [np.random.random((10000, 64)) for _ in range(10)]
+        self.query = np.random.random(64)
 
         self.x1 = np.array([1, 2, 3])
         self.x2 = np.array(
