@@ -68,8 +68,10 @@ def fx_forward_from_src_skip_result(*args, **kwargs):
 def wrap_compiler_fn(compiler_fn):
     """WrapperBackend if config.verify_correctness is True"""
     if isinstance(compiler_fn, str):
-        from .optimizations import BACKENDS
-        wrapped_compiler_fn = BACKENDS[compiler_fn]
+        # from .optimizations import BACKENDS
+        # wrapped_compiler_fn = BACKENDS[compiler_fn]
+        from towhee.compiler.backends import resolve
+        wrapped_compiler_fn = resolve(compiler_fn)
     else:
         wrapped_compiler_fn = compiler_fn
 
