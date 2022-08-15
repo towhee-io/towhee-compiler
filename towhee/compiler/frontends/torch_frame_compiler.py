@@ -1,14 +1,15 @@
 import dis
 import sys
-import traceback
 import warnings
 from types import CodeType
 from types import FrameType
 from typing import Callable
 
+import torch
 from towhee.compiler import passes
 
 from torchdynamo import config
+from torchdynamo.allowed_functions import is_allowed
 from torchdynamo.bytecode_transformation import assemble
 from torchdynamo.bytecode_transformation import cleaned_instructions
 from torchdynamo.bytecode_transformation import devirtualize_jumps
@@ -16,8 +17,6 @@ from torchdynamo.bytecode_transformation import fix_extended_args
 from torchdynamo.bytecode_transformation import fix_vars
 from torchdynamo.bytecode_transformation import stacksize_analysis
 from torchdynamo.bytecode_transformation import update_offsets
-from torchdynamo.convert_frame import has_tensor_in_frame
-from torchdynamo.convert_frame import wrap_compiler_fn
 from torchdynamo.exc import BackendCompilerFailed
 from torchdynamo.exc import InternalTorchDynamoError
 from torchdynamo.exc import RestartAnalysis
@@ -29,9 +28,10 @@ from torchdynamo.guards import GuardedCode
 from torchdynamo.symbolic_convert import InstructionTranslator
 from torchdynamo.utils import CleanupManager
 from torchdynamo.utils import ExactWeakKeyDictionary
+from torchdynamo.utils import is_namedtuple
+from torchdynamo.utils import istype
 
 from .frame_compiler import FrameCompiler
-from .numba_frame_compiler import numba_compile
 
 orig_code_map = ExactWeakKeyDictionary()
 
@@ -45,21 +45,84 @@ def debug_print(prefix: str, frame: FrameType):
         frame.f_code.co_filename,
         frame.f_code.co_firstlineno,
     )
-    # print(dis.Bytecode(frame.f_code).info())
     print(dis.Bytecode(frame.f_code).dis())
+
+
+def _try_resolve_compiler_fn(compiler_fn):
+    """WrapperBackend if config.verify_correctness is True"""
+    if isinstance(compiler_fn, str):
+        from towhee.compiler.backends import resolve
+
+        return resolve(compiler_fn)
+    return compiler_fn
+
+
+def has_tensor_in_frame(frame):
+    """Check if the frame has torch.* related bits"""
+    # Check if the function was decorated with torchdynamo.optimize
+    # TODO: re-enable this check
+    # if frame.f_code in always_optimize_code_objects:
+    #     return True
+
+    # Check if there is global import of torch.*
+    for co_name in frame.f_code.co_names:
+        if co_name in frame.f_globals:
+            if is_allowed(frame.f_globals[co_name]):
+                return True
+
+    seen_ids = dict()
+
+    def has_tensor(obj):
+        """Recursively check if the obj has a tensor"""
+        obj_id = id(obj)
+        if obj_id in seen_ids:
+            return seen_ids[obj_id]
+        seen_ids[obj_id] = False
+
+        if isinstance(obj, (torch.Tensor, torch.nn.Module)):
+            seen_ids[obj_id] = True
+            return seen_ids[obj_id]
+        elif istype(obj, (list, tuple)):
+            seen_ids[obj_id] = any([has_tensor(v) for v in obj])
+            return seen_ids[obj_id]
+        elif istype(obj, dict):
+            seen_ids[obj_id] = any([has_tensor(v) for v in obj.values()])
+            return seen_ids[obj_id]
+        elif istype(obj, (str, int, float, type(None), bool)):
+            seen_ids[obj_id] = False
+            return seen_ids[obj_id]
+        elif is_namedtuple(obj):
+            seen_ids[obj_id] = any([has_tensor(getattr(obj, v)) for v in obj._fields])
+            return seen_ids[obj_id]
+        elif (
+            not is_allowed(obj)
+            and hasattr(obj, "__dict__")
+            and len(getattr(obj, "__dict__"))
+        ):
+            seen_ids[obj_id] = any([has_tensor(v) for v in obj.__dict__.values()])
+            return seen_ids[obj_id]
+        else:
+            return False
+
+    # Check if the passed arguments are of type Tensor
+    for value in frame.f_locals.values():
+        if has_tensor(value):
+            return True
+
+    return False
 
 
 class TorchFrameCompiler(FrameCompiler):
     def __init__(self, graph_compile_fn: Callable, one_graph: bool) -> None:
         super().__init__()
-        self.graph_compile_fn = wrap_compiler_fn(graph_compile_fn)
+        self.graph_compile_fn = _try_resolve_compiler_fn(graph_compile_fn)
         self.one_graph = one_graph
 
     def __call__(self, frame: FrameType, cache_size: int) -> GuardedCode:
         if not self.check_cache(frame, cache_size):
             return None
         if not has_tensor_in_frame(frame):
-            return numba_compile(frame)
+            return None
         return self.call(frame)
 
     def call(self, frame: FrameType) -> GuardedCode:
@@ -71,6 +134,8 @@ class TorchFrameCompiler(FrameCompiler):
             raise
         except Exception:
             if config.debug or config.trace or config.print_internal_exceptions:
+                import traceback
+
                 debug_print("WONT CONVERT", frame)
                 warnings.warn("=" * 10 + " TorchDynamo Stack Trace " + "=" * 10 + "\n")
                 traceback.print_exc()
