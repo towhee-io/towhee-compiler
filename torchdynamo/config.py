@@ -66,7 +66,7 @@ normalize_ir = True
 traceable_tensor_subclasses = set()
 
 # Propagate backend exceptions up to torchdynamo.optimize
-raise_on_backend_error = True
+raise_on_backend_error = False
 
 # If a PyTorch module is in this allowlist, torchdynamo will be allowed
 # to inline objects from it or its children.
