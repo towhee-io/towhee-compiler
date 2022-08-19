@@ -15,9 +15,8 @@ __TORCH_CODE_CACHE__ = {}
 
 def torch_compile(frame: FrameType, graph_compile_fn: Callable):
     """
-    TODO: Fix hf_T5
-    TODO: Fix opacus_cifar10
-    TODO: Fix pytorch_struct
+    TODO: Fix opacus_cifar10, failback to torchdyname
+    TODO: Fix pytorch_struct, crash
     """
 
     cache_target = id(frame.f_code)
@@ -66,9 +65,6 @@ def torch_compile(frame: FrameType, graph_compile_fn: Callable):
         import traceback
 
         traceback.print_exc()
-        import ipdb
-
-        ipdb.set_trace()
         return None
 
 
