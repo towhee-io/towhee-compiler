@@ -5,6 +5,7 @@ from towhee.compiler.jit import _eval_frame as _C
 
 from torchdynamo import skipfiles
 from torchdynamo.exc import BackendCompilerFailed
+from torchdynamo.eval_frame import TorchPatcher
 
 from ..frontends.compiler_dispatcher import CompilerDispatcher
 from ..log import get_logger
@@ -51,10 +52,10 @@ class CompilerContext:
     def __init__(self, compile_fn, patch_fn=None, extra_ctx=None):
         super().__init__()
         self.compile_fn = compile_fn
-        self.patch_fn = patch_fn
 
         self.prior = None
         self.extra_ctx = extra_ctx
+        patch_fn()
         # log.info(f"==== using new towhee compile decorator ====")
 
     def __enter__(self):
@@ -80,4 +81,4 @@ class CompilerContext:
 
 def compile(backend):
     safe_frame_compile_fn = _make_safe_frame_compile_fn(backend)
-    return CompilerContext(safe_frame_compile_fn)
+    return CompilerContext(safe_frame_compile_fn, TorchPatcher.patch)
