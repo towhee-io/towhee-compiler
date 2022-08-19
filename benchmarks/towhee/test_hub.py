@@ -42,7 +42,7 @@ def transformers_jit(model_name):
             )
 
 
-class TestNNop(TestCase):
+class TestHub(TestCase):
     def test_timm(self):
         data = towhee.ops.image_decode()('towhee_logo.png')
         for name in timm_model_name:
