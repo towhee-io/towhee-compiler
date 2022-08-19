@@ -1,4 +1,5 @@
 import functools
+import hashlib
 import importlib
 import itertools
 import json
@@ -96,7 +97,10 @@ class SubGraph(object):
         self.model = model
         self.example_inputs = example_inputs
         self.model_dir = model_dir
-        self.hash_path = graph_hash(model, example_inputs)
+        try:
+            self.hash_path = graph_hash(model, example_inputs)
+        except:
+            self.hash_path = hashlib.md5(str(model).encode()).hexdigest()
 
     def filename(self, name):
         return os.path.join(self.model_dir, name)
