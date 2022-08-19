@@ -49,16 +49,16 @@ class TestHub(TestCase):
             timm_func0 = timm_ori(name)
             _ = timm_func0(data)
             t1 = time.time()
-            _ = timm_func0(data)
+            res0 = timm_func0(data)
             t2 = time.time()
 
             timm_func1 = timm_jit(name)
             _ = timm_func1(data)
             t3 = time.time()
-            _ = timm_func1(data)
+            res1 = timm_func1(data)
             t4 = time.time()
 
-            print(f'timm_model: {name}: {t2 - t1} vs {t4 - t3}')
+            print(f'timm_model: {name}: {t4 - t3} vs {t2 - t1}, {res0} \n{res1}')
             self.assertTrue(t2 - t1 > t4 - t3)
 
     def test_bert(self):
@@ -67,16 +67,16 @@ class TestHub(TestCase):
             timm_func0 = transformers_ori(name)
             _ = timm_func0(data)
             t1 = time.time()
-            _ = timm_func0(data)
+            res0 = timm_func0(data)
             t2 = time.time()
 
             timm_func1 = transformers_jit(name)
             _ = timm_func1(data)
             t3 = time.time()
-            _ = timm_func1(data)
+            res1 = timm_func1(data)
             t4 = time.time()
 
-            print(f'transformer_model: {name} {t2 - t1} vs {t4 - t3}')
+            print(f'transformer_model: {name} {t4 - t3} vs {t2 - t1}, {res0} \n{res1}')
             self.assertTrue(t2 - t1 > t4 - t3)
 
     @classmethod

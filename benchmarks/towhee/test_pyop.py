@@ -22,7 +22,7 @@ class TestPyop(TestCase):
         self.query = np.random.random(128)
 
         t1 = time.time()
-        _ = (
+        self.ori_res = (
             towhee.dc['a'](self.data)
             .runas_op['a', 'b'](func=lambda _: self.query)
             .inner_distance[('b', 'a'), 'c']()
@@ -32,11 +32,12 @@ class TestPyop(TestCase):
 
     def test_set_jit(self):
         t1 = time.time()
-        _ = (
+        res = (
             towhee.dc['a'](self.data)
             .runas_op['a', 'b'](func=lambda _: self.query)
             .set_jit('towhee')
             .inner_distance[('b', 'a'), 'c']()
         )
         t2 = time.time()
+        print(f'ofi: {t2 - t1} vs {self.ori_time}, {self.ori_res[0].c[:5]} \n{res[0].c[:5]}')
         self.assertTrue(t2-t1 < self.ori_time)
