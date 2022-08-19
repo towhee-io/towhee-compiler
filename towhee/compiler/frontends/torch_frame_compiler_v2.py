@@ -1,4 +1,3 @@
-import hashlib
 from types import FrameType
 from typing import Callable
 
@@ -43,8 +42,15 @@ def torch_compile(frame: FrameType, graph_compile_fn: Callable):
             model = frame.f_locals["self"]
             args = tuple(args)
             compiled_fn = graph_compile_fn(model, example_inputs=args)
+            if compiled_fn is None:
+                return None
+
             def wrapper(*wargs, **wkwargs):
-                return compiled_fn(*wargs[1:], **wkwargs)[0]
+                retval = compiled_fn(*wargs[1:], **wkwargs)
+                if isinstance(retval, tuple) and len(retval) == 1:
+                    return retval[0]
+                return retval
+
             __TORCH_CODE_CACHE__[cache_target] = torchdynamo.disable(wrapper)
             frame.f_globals["__TORCH_CODE_CACHE__"] = __TORCH_CODE_CACHE__
             retval = GuardedCode(
