@@ -56,12 +56,13 @@ class TestNNop(TestCase):
         self.ori_time = t2 - t1
 
     def test_set_jit(self):
-        _ = (
+        res0 = (
             towhee.dc['a'](self.data)
             .set_jit('towhee')
             .image_embedding0['a', 'b']()
         )
         self.assertTrue(Path(cached_dir).is_dir())
+        print(f'set_jit result: {res0[0].b[:10]}')
 
     def test_nebullvm(self):
         op3 = towhee.ops.image_embedding0()
@@ -69,9 +70,9 @@ class TestNNop(TestCase):
         with jit_compile(backend='nebullvm'):
             _ = op3(self.data[0])
             t1 = time.time()
-            _ = op3(self.data[0])
+            res1 = op3(self.data[0])
             t2 = time.time()
-        print(f'nebullvm: {t2 - t1} vs {self.ori_time}')
+        print(f'nebullvm: {t2 - t1} vs {self.ori_time}, {res1}')
         self.assertTrue(t2 - t1 < self.ori_time)
 
     def test_ofi(self):
@@ -80,9 +81,9 @@ class TestNNop(TestCase):
         with jit_compile(backend='ofi'):
             _ = op2(self.data[0])
             t1 = time.time()
-            _ = op2(self.data[0])
+            res2 = op2(self.data[0])
             t2 = time.time()
-        print(f'ofi: {t2 - t1} vs {self.ori_time}')
+        print(f'ofi: {t2 - t1} vs {self.ori_time}, {res2}')
         self.assertTrue(t2 - t1 < self.ori_time)
 
     @classmethod
