@@ -14,7 +14,11 @@ __TORCH_CODE_CACHE__ = {}
 
 
 def torch_compile(frame: FrameType, graph_compile_fn: Callable):
-    from torch import fx
+    """
+    TODO: Fix hf_T5
+    TODO: Fix opacus_cifar10
+    TODO: Fix pytorch_struct
+    """
 
     cache_target = id(frame.f_code)
 
@@ -68,7 +72,7 @@ def torch_compile(frame: FrameType, graph_compile_fn: Callable):
         return None
 
 
-class TorchFrameCompilerV2(FrameCompiler):
+class NNModuleFrameCompiler(FrameCompiler):
     def __init__(self, graph_compile_fn: Callable) -> None:
         super().__init__()
         self.graph_compile_fn = _try_resolve_compiler_fn(graph_compile_fn)
