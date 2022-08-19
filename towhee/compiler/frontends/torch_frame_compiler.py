@@ -1,3 +1,4 @@
+import copy
 import dis
 import sys
 import warnings
@@ -28,8 +29,11 @@ from torchdynamo.guards import GuardedCode
 from torchdynamo.symbolic_convert import InstructionTranslator
 from torchdynamo.utils import CleanupManager
 from torchdynamo.utils import ExactWeakKeyDictionary
+from torchdynamo.utils import checkpoint_params
+from torchdynamo.utils import clone_inputs
 from torchdynamo.utils import is_namedtuple
 from torchdynamo.utils import istype
+from torchdynamo.utils import same
 
 from .frame_compiler import FrameCompiler
 
@@ -48,12 +52,53 @@ def debug_print(prefix: str, frame: FrameType):
     print(dis.Bytecode(frame.f_code).dis())
 
 
+class WrapperBackend:
+    def __init__(self, backend=None):
+        self.backend = backend
+
+    @property
+    def example_inputs(self):
+        return clone_inputs(self.original_example_inputs)
+
+    def __call__(self, gm: torch.fx.GraphModule, example_inputs):
+        self.restore = checkpoint_params(gm)
+        self.original_example_inputs = clone_inputs(example_inputs)
+        self.gm = gm
+        copy_gm = copy.deepcopy(self.gm)
+        self.candidate = self.backend(copy_gm, self.original_example_inputs)
+
+        # if self.candidate is None or self.candidate is self.gm.forward:
+        #     return self.gm.forward
+
+        # if not config.verify_correctness:
+        #     return self.candidate
+
+        # if verify_correctness=True
+        try:
+            correct = self.gm.forward(*self.example_inputs)
+            result = self.candidate(*self.example_inputs)
+
+            # TODO: replace `same` function with the one in testing
+            if same(correct, result):
+                return self.candidate
+
+            print(f"incorrect results of backend {self}")
+            return self.gm.forward
+
+        except Exception:
+            warnings.warn("default", "error in verify_correctness")
+            return self.gm.forward
+        finally:
+            self.restore()
+
+
 def _try_resolve_compiler_fn(compiler_fn):
     """WrapperBackend if config.verify_correctness is True"""
     if isinstance(compiler_fn, str):
         from towhee.compiler.backends import resolve
 
-        return resolve(compiler_fn)
+        compiler_fn = resolve(compiler_fn)
+    compiler_fn = WrapperBackend(compiler_fn)
     return compiler_fn
 
 
