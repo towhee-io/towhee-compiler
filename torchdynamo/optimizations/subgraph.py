@@ -151,7 +151,7 @@ class SubGraph(object):
 
         try:
             torch.onnx.export(
-                self.scripted,
+                self.model,
                 self.example_inputs,
                 filename,
                 input_names=self.input_names,
