@@ -13,3 +13,4 @@ tags
 *.swp
 dist
 .~lock*
+.DS_Store
