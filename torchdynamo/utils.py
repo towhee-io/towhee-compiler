@@ -250,7 +250,7 @@ def clone_inputs(example_inputs):
     for i in range(len(res)):
         if isinstance(res[i], torch.Tensor):
             res[i] = clone_input(res[i])
-    return res
+    return tuple(res) if isinstance(example_inputs, tuple) else res
 
 
 def is_jit_model(model0):
@@ -459,6 +459,8 @@ except ImportError:
 
 def same(a, b, cos_similarity=False, tol=1e-4, equal_nan=False):
     """Check correctness to see if a and b match"""
+    # import traceback; traceback.print_stack()
+    # import ipdb; ipdb.set_trace()
     if isinstance(a, (list, tuple, torch.nn.ParameterList, torch.Size)):
         assert isinstance(b, (list, tuple)), f"type mismatch {type(a)} {type(b)}"
         return len(a) == len(b) and all(
