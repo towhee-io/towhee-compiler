@@ -13,3 +13,6 @@ tags
 *.swp
 dist
 .~lock*
+.VSCodeCounter/
+towhee-jit/
+.vscode/
