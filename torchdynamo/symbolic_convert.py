@@ -9,51 +9,69 @@ import operator
 import sys
 import traceback
 import types
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Sequence
 from unittest.mock import patch
 
 import torch
+from towhee.compiler.bytecode import Instruction
+from towhee.compiler.bytecode import create_instruction
 from typeguard import typechecked
 
 import torchdynamo.side_effects
 import torchdynamo.variables.base
-from torchdynamo.source import AttrSource, GetItemSource, GlobalSource, LocalSource
-from towhee.compiler.bytecode import Instruction, create_instruction
+from torchdynamo.source import AttrSource
+from torchdynamo.source import GetItemSource
+from torchdynamo.source import GlobalSource
+from torchdynamo.source import LocalSource
 
-from . import config, exc, skipfiles
+from . import config
+from . import exc
+from . import skipfiles
 from . import variables as vars
-from .allowed_functions import is_allowed, is_builtin
+from .allowed_functions import is_allowed
+from .allowed_functions import is_builtin
 from .bytecode_analysis import livevars_analysis
-from .bytecode_transformation import cleaned_instructions, is_generator, unique_id
+from .bytecode_transformation import cleaned_instructions
+from .bytecode_transformation import is_generator
+from .bytecode_transformation import unique_id
 from .codegen import PyCodegen
-from .exc import Unsupported, unimplemented
+from .exc import Unsupported
+from .exc import unimplemented
 from .guards import GuardBuilder
 from .output_graph import OutputGraph
-from .resume_execution import ContinueExecutionCache, ReenterWith
-from .utils import counters, fake_tensors_available, istype
-from .variables import (
-    BaseListVariable,
-    BuiltinVariable,
-    ClosureVariable,
-    ConstantVariable,
-    ConstDictVariable,
-    ContextManagerVariable,
-    GetAttrVariable,
-    ListIteratorVariable,
-    ListVariable,
-    NestedUserFunctionVariable,
-    NNModuleVariable,
-    PythonModuleVariable,
-    SliceVariable,
-    TensorVariable,
-    TorchVariable,
-    TupleVariable,
-    UnknownVariable,
-    UserFunctionVariable,
-    Variable,
-    WithExitFunctionVariable,
-)
-from .variables.base import MutableLocal, typestr
+from .resume_execution import ContinueExecutionCache
+from .resume_execution import ReenterWith
+from .utils import counters
+from .utils import fake_tensors_available
+from .utils import istype
+from .variables import BaseListVariable
+from .variables import BuiltinVariable
+from .variables import ClosureVariable
+from .variables import ConstantVariable
+from .variables import ConstDictVariable
+from .variables import ContextManagerVariable
+from .variables import GetAttrVariable
+from .variables import ListIteratorVariable
+from .variables import ListVariable
+from .variables import NestedUserFunctionVariable
+from .variables import NNModuleVariable
+from .variables import PythonModuleVariable
+from .variables import SliceVariable
+from .variables import TensorVariable
+from .variables import TorchVariable
+from .variables import TupleVariable
+from .variables import UnknownVariable
+from .variables import UserFunctionVariable
+from .variables import Variable
+from .variables import WithExitFunctionVariable
+from .variables.base import MutableLocal
+from .variables.base import typestr
 from .variables.functions import BaseUserFunctionVariable
 from .variables.misc import GradModeVariable
 from .variables.user_defined import UserDefinedVariable
@@ -1157,12 +1175,10 @@ class InstructionTranslatorBase(object):
         self.random_calls: List[tuple] = []
 
         if sys.version_info >= (3, 10):
-            from .resume_execution import (
-                CO_ASYNC_GENERATOR,
-                CO_COROUTINE,
-                CO_GENERATOR,
-                CO_ITERABLE_COROUTINE,
-            )
+            from .resume_execution import CO_ASYNC_GENERATOR
+            from .resume_execution import CO_COROUTINE
+            from .resume_execution import CO_GENERATOR
+            from .resume_execution import CO_ITERABLE_COROUTINE
 
             if f_code.co_flags & (
                 CO_GENERATOR | CO_COROUTINE | CO_ITERABLE_COROUTINE | CO_ASYNC_GENERATOR

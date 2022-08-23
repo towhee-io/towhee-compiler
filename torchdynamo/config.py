@@ -13,7 +13,7 @@ except ImportError:
     HAS_REFS_PRIMS = False
 
 # directory to save model
-cached_dir = 'towhee-jit'
+cached_dir = "towhee-jit"
 
 # print out lots of stuff
 debug = False

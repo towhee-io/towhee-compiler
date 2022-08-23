@@ -1,10 +1,12 @@
 import time
+
+import numpy as np
 import torch
 import torchvision.models as models
-import numpy as np
 import towhee.compiler
+from towhee.compiler import get_logger
 from towhee.compiler import jit_compile
-from towhee.compiler import set_log_level, get_logger
+from towhee.compiler import set_log_level
 
 set_log_level("info")
 

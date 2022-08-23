@@ -165,7 +165,7 @@ for _name in (
     "xarray",
     "towhee",
     "PIL",
-    "cv2"
+    "cv2",
 ):
     add(_name)
 

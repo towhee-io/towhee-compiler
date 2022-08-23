@@ -16,9 +16,10 @@ from ..utils import count_calls
 from ..utils import counters
 from ..utils import timed
 from .backends import BACKENDS
+from .hash_name import folder_name
+from .hash_name import string_key
 from .normalize import long_name
 from .normalize import normalize_ir
-from .hash_name import folder_name, string_key
 
 log = logging.getLogger(__name__)
 

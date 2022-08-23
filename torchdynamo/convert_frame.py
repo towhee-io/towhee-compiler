@@ -9,7 +9,6 @@ from typing import Callable
 
 import torch
 from torch.fx.graph_module import _forward_from_src as original_forward_from_src
-
 from towhee.compiler import passes
 
 from . import config
@@ -46,7 +45,7 @@ class _Tracker(dict):
 
     def __contains__(self, item):
         return dict.__contains__(self, id(item))
-    
+
     @property
     def seen(self):
         return list(self.values())
@@ -71,6 +70,7 @@ def wrap_compiler_fn(compiler_fn):
         # from .optimizations import BACKENDS
         # wrapped_compiler_fn = BACKENDS[compiler_fn]
         from towhee.compiler.backends import resolve
+
         wrapped_compiler_fn = resolve(compiler_fn)
     else:
         wrapped_compiler_fn = compiler_fn
@@ -227,7 +227,7 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
                 "default",
                 f"torchdynamo hit config.cache_size_limit ({config.cache_size_limit})\n"
                 f"   function: {format_func_info(code)}\n"
-                f"   reasons:  {format_guard_failures(code)}\n"
+                f"   reasons:  {format_guard_failures(code)}\n",
             )
             unimplemented("cache_size_limit reached")
         output = None
@@ -310,17 +310,13 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
         except Exception:
             if config.debug or config.trace or config.print_internal_exceptions:
                 debug_print("WONT CONVERT")
-                warnings.warn(
-                    "=" * 10 + " TorchDynamo Stack Trace " + "=" * 10 + "\n"
-                )
+                warnings.warn("=" * 10 + " TorchDynamo Stack Trace " + "=" * 10 + "\n")
                 traceback.print_exc()
                 warnings.warn(
                     "=" * 10 + " Exception (above) while processing " + "=" * 10 + "\n",
                 )
                 traceback.print_stack(frame)
-                warnings.warn(
-                    "=" * 10 + " End debug info " + "=" * 10 + "\n"
-                )
+                warnings.warn("=" * 10 + " End debug info " + "=" * 10 + "\n")
             raise InternalTorchDynamoError()
 
     return wrap_convert_context(_convert_frame_assert)

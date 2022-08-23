@@ -189,8 +189,15 @@ if __name__ == "__main__":
     parser.add_argument("-R", "--round", type=int, default=1)
     parser.add_argument("-Q", "--perf_loss_ths", type=float, default=None)
     parser.add_argument("-S", "--skip", type=str, default=None)
-    parser.add_argument("--feature", action="store_true", help="use towhee compiler decorator")
-    parser.add_argument("--no-feature", dest="feature", action="store_false", help="use torchdynamo decorator")
+    parser.add_argument(
+        "--feature", action="store_true", help="use towhee compiler decorator"
+    )
+    parser.add_argument(
+        "--no-feature",
+        dest="feature",
+        action="store_false",
+        help="use torchdynamo decorator",
+    )
     parser.set_defaults(feature=False)
     parser.add_argument("-l", "--log", type=str, default="info", help="log level")
     args = parser.parse_args()

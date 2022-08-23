@@ -348,7 +348,9 @@ class TorchPatcher:
 
         towhee.engine.factory.op = disable(towhee.engine.factory.op)
 
-        torchvision.transforms.Compose.__call__ = disable(torchvision.transforms.Compose.__call__)
+        torchvision.transforms.Compose.__call__ = disable(
+            torchvision.transforms.Compose.__call__
+        )
 
     @staticmethod
     def suppress_torch_distributed_warnings(fn):
