@@ -12,7 +12,7 @@ class NebullvmCompiler(BackendCompiler):
 
     def compile(self, subgraph: SubGraph):
         from nebullvm import optimize_torch_model
-        from nebullvm.inference_learners.onnx import PytorchONNXInferenceLearner
+        from nebullvm.inference_learners.base import LearnerMetadata
 
         model = subgraph.model
         inputs = subgraph.example_inputs
@@ -25,7 +25,7 @@ class NebullvmCompiler(BackendCompiler):
         with param_scope() as ps:
             if cached_model_dir.exists():
                 print(f"using cached model in {str_cached_model_dir}")
-                return PytorchONNXInferenceLearner.load(str_cached_model_dir)
+                return LearnerMetadata.read(str_cached_model_dir + '/optimized_model').load_model(str_cached_model_dir)
             else:
                 try:
                     if config.debug:
