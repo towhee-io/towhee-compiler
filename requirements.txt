@@ -3,3 +3,4 @@ recordclass
 tabulate
 torch
 typeguard
+nebullvm
