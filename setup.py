@@ -29,9 +29,8 @@ setup(
     packages=find_packages(
         include=[
             "towhee",
-            "towhee.compiler",
-            "torchdynamo",
-            "torchdynamo.*",
+            "towhee.compiler*",
+            "torchdynamo*",
         ]
     ),
     namespace_package=["towhee"],
