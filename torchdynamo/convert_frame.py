@@ -10,8 +10,6 @@ from typing import Callable
 import torch
 from torch.fx.graph_module import _forward_from_src as original_forward_from_src
 
-from towhee.compiler import passes
-
 from . import config
 from .allowed_functions import is_allowed
 from .bytecode_transformation import is_generator
@@ -255,6 +253,7 @@ def convert_frame_assert(compiler_fn: Callable, guard_export_fn=None, one_graph=
             instructions[:] = output.output_instructions
             code_options.update(output.code_options)
 
+            from towhee.compiler import passes
             instructions[:] = passes.bytecode.common().execute(instructions)
 
         def debug_print(prefix):
