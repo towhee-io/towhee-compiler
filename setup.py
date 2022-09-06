@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from typing import List
+
 from setuptools import Extension
 from setuptools import find_packages
 from setuptools import setup
@@ -13,9 +15,16 @@ Towhee compiler uses a frame evaluation hook (see [PEP 523]: https://www.python.
 to get the chance of compiling python bytecodes into native code.
 """
 
+def parse_requirements(file_name: str) -> List[str]:
+    with open(file_name) as f:
+        return [
+            require.strip() for require in f
+            if require.strip() and not require.startswith('#')
+        ]
+
 setup(
     name="towhee.compiler",
-    version="0.1.0",
+    version="0.1.0rc5",
     url="https://github.com/towhee-io/towhee-compiler",
     description="A JIT compiler for accelerating AI programs written in python.",
     long_description=long_description,
@@ -25,7 +34,7 @@ setup(
     license="BSD-3",
     keywords="pytorch machine learning compilers",
     python_requires=">=3.7, <3.11",
-    install_requires=["torch", "numpy", "tabulate"],
+    install_requires=parse_requirements('requirements.txt'),
     packages=find_packages(
         include=[
             "towhee",
