@@ -1,6 +1,6 @@
+nebullvm<=0.4.0
 numpy
 recordclass
 tabulate
 torch
 typeguard
-nebullvm
