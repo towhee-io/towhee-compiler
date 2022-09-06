@@ -1,34 +1,71 @@
-# Contributing to torchdynamo
-We want to make contributing to this project as easy and transparent as
-possible.
+## Contributing to Towhee Compiler
 
-## Pull Requests
-We actively welcome your pull requests.
+Submitting issues, answering questions, and improving documentation are some of the many ways you can join our growing community. Regardless of how you contribute, please remember to be respectful towards your fellow Towheeians.
 
-1. Fork the repo and create your branch from `main`.
-2. If you've added code that should be tested, add tests.
-3. Ensure the test suite passes by running `pytest`
-4. Auto-reformat your code with [black]/[isort] by running `make format`
-5. Make sure your code lints. (`make lint` to run linters)
-6. If you haven't already, complete the Contributor License Agreement ("CLA").
+### Contributing code
 
-[black]: https://black.readthedocs.io/
-[isort]: https://pycqa.github.io/isort/
+The Towhee community maintains a list of [Good First Issues](https://github.com/towhee-io/towhee-compiler/contribute).
 
-## Contributor License Agreement ("CLA")
-In order to accept your pull request, we need you to submit a CLA. You only need
-to do this once to work on any of Meta's open source projects.
+### Sharing a new operator or pipeline
 
-Complete your CLA here: <https://code.facebook.com/cla>
+Pipeline and operator contributions to our Towhee Hub are just as valued as artwork, code, and documentation contributions. If you have a new model, useful script, or an `x2vec` pipeline that you'd like to share with the Towhee community, [get in touch](mailto:towhee-team@zilliz.com) with us!
 
-## Issues
-We use GitHub issues to track public bugs. Please ensure your description is
-clear and has sufficient instructions to be able to reproduce the issue.
+### Submitting a new issue or feature request
 
-Meta has a [bounty program](https://www.facebook.com/whitehat/) for the safe
-disclosure of security bugs. In those cases, please go through the process
-outlined on that page and do not file a public issue.
+Please follow the [templates](https://github.com/towhee-io/towhee/issues/new/choose) we provide for submitting bugs, enhancements, and/or feature requests; try to avoid opening blank issues whenever possible.
 
-## License
-By contributing to TorchDynamo, you agree that your contributions will be licensed
-under the LICENSE file in the root directory of this source tree.
+### Style guide
+
+We generally follow the [Google Python style guide](https://google.github.io/styleguide/pyguide.html) - this applies to the main `towhee-io/towhee` repo on Github as well as code uploaded to our Towhee Hub. We have some special rules regarding line length, imports, and whitespace - please take a look at the [Towhee style guide](https://github.com/towhee-io/towhee/blob/main/STYLE_GUIDE.md) for more information.
+
+## Pull requests
+
+We follow a fork-and-pull model for all contributions. Before starting, we strongly recommend looking through existing PRs so you can get a feel for things.
+
+If you're interested in contributing to the `towhee-io/towhee` codebase, follow these steps:
+
+1. Fork [Towhee](https://github.com/towhee-io/towhee-compiler). If you've forked Towhee already, simply fetch the latest changes from upstream.
+
+2. Clone your forked version of Towhee.
+
+  ```bash
+  $ git clone https://github.com/<your_username>/towhee-compiler.git
+  $ cd towhee-compiler
+  ```
+
+  If you've done this step before, make sure you're on the `main` branch and sync your changes.
+
+  ```bash
+  $ git checkout main
+  $ git pull origin main
+  ```
+
+3. Think up a suitable name for your update, bugfix, or feature. Try to avoid using branch names you've already used in the past.
+
+  ```bash
+  $ git checkout -b my-creative-branch-name
+  ```
+
+4. During development, you might want to run `pylint` or one of the tests. You can do so with one of the commands below:
+
+  ```bash
+  $ pylint --rcfile pylint.conf
+  $ pytest tests/unittests/<test_case>.py
+  ```
+
+5. If you're contributing a bugfix or docfix, squash your previous `N` commits. The interactive rebase functionality provided by git will walk you through the commit squashing process.
+
+  ```bash
+  $ git rebase -i HEAD~N
+  ```
+
+  P.S. Don't forget to commit your changes! We use a single-phrase, periodless format for commit messages (be sure to capitalize the first character):
+
+  ```bash
+  $ git commit -m "My awesome commit message"
+  ```
+
+6. Submit your pull request on Github. Folks in the community will discuss your pull request, and maintainers might ask you for some changes. This happens very frequently (including maintainers themselves), so don't worry if it happens to you as well.
+
+  Note that Towhee uses [DCOs](https://developercertificate.org/) to sign pull requests. Please ensure that the first line of your PR is as follows:
+  Signed-off-by: Your Name your.email@domain.com
