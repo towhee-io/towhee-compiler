@@ -110,7 +110,6 @@ def ofi(subgraph):
     return torch.jit.optimize_for_inference(subgraph.scripted)
 
 
-<<<<<<< HEAD
 @create_backend
 def nebullvm(subgraph):
     from nebullvm import optimize_torch_model
@@ -124,37 +123,10 @@ def nebullvm(subgraph):
 
     from towhee.functional import param_scope
     with param_scope() as ps:
-<<<<<<< HEAD
         if cached_model_dir.exists():
             print(f"using cached model in {str_cached_model_dir}")
             return PytorchONNXInferenceLearner.load(str_cached_model_dir)
         else:
-<<<<<<< HEAD
-            if debug:
-                print(f"Saving the model to ", str_cached_model_dir)
-            cached_model_dir.mkdir(parents=True)
-            return optimize_torch_model(
-                model=model,
-                save_dir=str_cached_model_dir,
-                dataloader=[[inputs, None]],
-                perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-            )
-=======
-        if save_dir.exists():
-            try:
-                return LearnerMetadata.read(nebullvm_dir).load_model(nebullvm_dir)
-            except:
-                pass
-        if not save_dir.exists():
-            save_dir.mkdir()
-        return optimize_torch_model(
-            model=model,
-            save_dir=nebullvm_dir,
-            dataloader=[[inputs, None]],
-            perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-        )
->>>>>>> 0405baf... cleanup variables
-=======
             try:
                 if debug:
                     print(f"Saving the model to {str_cached_model_dir}")
@@ -169,40 +141,6 @@ def nebullvm(subgraph):
                 if debug:
                     print(f"Failed to save the model, error:", e)
                 cached_model_dir.rmdir()
->>>>>>> 9441666... Exception to save the model
-=======
-# @create_backend
-# def nebullvm(subgraph):
-#     from nebullvm import optimize_torch_model
-#     from nebullvm.inference_learners.onnx import PytorchONNXInferenceLearner
-
-#     model = subgraph.model
-#     inputs = subgraph.example_inputs
-#     hash_path = subgraph.hash_path
-#     cached_model_dir = Path(cached_dir) / hash_path
-#     str_cached_model_dir = str(cached_model_dir.absolute())
-
-#     from towhee.functional import param_scope
-#     with param_scope() as ps:
-#         if cached_model_dir.exists():
-#             print(f"using cached model in {str_cached_model_dir}")
-#             return PytorchONNXInferenceLearner.load(str_cached_model_dir)
-#         else:
-#             try:
-#                 if debug:
-#                     print(f"Saving the model to {str_cached_model_dir}")
-#                 cached_model_dir.mkdir(parents=True)
-#                 return optimize_torch_model(
-#                     model=model,
-#                     save_dir=str_cached_model_dir,
-#                     dataloader=[[inputs, None]],
-#                     perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-#                 )
-#             except Exception as e:
-#                 if debug:
-#                     print(f"Failed to save the model, error:", e)
-#                 cached_model_dir.rmdir()
->>>>>>> 31bf402... add backend compiler
 
 
 @create_backend
