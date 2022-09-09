@@ -119,40 +119,28 @@ def nebullvm(subgraph):
     inputs = subgraph.example_inputs
     hash_path = subgraph.hash_path
     cached_model_dir = Path(cached_dir) / hash_path
-    str_cached_model_dir = str(cached_model_dir)
+    str_cached_model_dir = str(cached_model_dir.absolute())
 
     from towhee.functional import param_scope
     with param_scope() as ps:
-<<<<<<< HEAD
         if cached_model_dir.exists():
-            if debug:
-                print(f"Found the cached model in ", str_cached_model_dir)
+            print(f"using cached model in {str_cached_model_dir}")
             return PytorchONNXInferenceLearner.load(str_cached_model_dir)
         else:
-            if debug:
-                print(f"Saving the model to ", str_cached_model_dir)
-            cached_model_dir.mkdir(parents=True)
-            return optimize_torch_model(
-                model=model,
-                save_dir=str_cached_model_dir,
-                dataloader=[[inputs, None]],
-                perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-            )
-=======
-        if save_dir.exists():
             try:
-                return LearnerMetadata.read(nebullvm_dir).load_model(nebullvm_dir)
-            except:
-                pass
-        if not save_dir.exists():
-            save_dir.mkdir()
-        return optimize_torch_model(
-            model=model,
-            save_dir=nebullvm_dir,
-            dataloader=[[inputs, None]],
-            perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
-        )
->>>>>>> 0405baf... cleanup variables
+                if debug:
+                    print(f"Saving the model to {str_cached_model_dir}")
+                cached_model_dir.mkdir(parents=True)
+                return optimize_torch_model(
+                    model=model,
+                    save_dir=str_cached_model_dir,
+                    dataloader=[[inputs, None]],
+                    perf_loss_ths=ps().towhee.compiler.perf_loss_ths(None),
+                )
+            except Exception as e:
+                if debug:
+                    print(f"Failed to save the model, error:", e)
+                cached_model_dir.rmdir()
 
 
 @create_backend
