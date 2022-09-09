@@ -13,10 +13,7 @@ tags
 *.swp
 dist
 .~lock*
-<<<<<<< HEAD
 .VSCodeCounter/
-towhee-jit/
+*towhee-jit/
 .vscode/
-=======
 .DS_Store
->>>>>>> 76c5780... Update gitignore
