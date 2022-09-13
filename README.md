@@ -8,11 +8,13 @@ Towhee compiler is a Python JIT compiler that speeds up AI-related codes by nati
 
 ### Install with pip
 
+> Some environments are not yet supported (like m1 etc.), please try installing from source.
+
 ```bash
-$ pip install towhee.compiler==0.1.0
+$ pip install towhee.compiler
 ```
 
-### Install with source code
+### Install from source code
 
 ```bash
 $ git clone -b 0.1.0 https://github.com/towhee-io/towhee-compiler.git
