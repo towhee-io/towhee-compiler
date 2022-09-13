@@ -4,10 +4,18 @@ Towhee compiler is a Python JIT compiler that speeds up AI-related codes by nati
 
 > The code is based on a forked version of torchdynamo, which extract `fx.Graph` by trace the execution of python code. But the goal of towhee compiler is `whole program code generation`, which also includes program that can not be represented by `fx.Graph`.
 
-## Install with source code
+## Install
+
+### Install with pip
 
 ```bash
-$ git clone -b nebullvm https://github.com/towhee-io/towhee-compiler.git
+$ pip install towhee.compiler
+```
+
+### Install with source code
+
+```bash
+$ git clone https://github.com/towhee-io/towhee-compiler.git
 $ cd towhee-compiler && pip install -r requirements
 $ python3 setup.py develop
 ```
@@ -126,3 +134,90 @@ with Timer('Towhee function with Compiler'):
 Towhee function: 0.14s
 
 Towhee function with Compiler: 0.08s
+
+### Tests in Towhee Hub
+
+According to the README of Operator on [Towhee Hub](https://towhee.io/tasks/operator), we set jit to compile and speedup model , theresults are as follows:
+
+> 5.5 means that the performance after jit is 5.5 times, and N means no speedup or compilation failure. And more test results will be updated continuously. 
+
+<table>
+   <tr>
+      <td><b>Field</b></td>
+      <td><b>Task</b></td>
+      <td><b>Operator</b></td>
+      <td><b>Speedup(CPU/GPU)</b></td>
+   </tr>
+   <tr>
+      <td rowspan="5">Image</td>
+      <td rowspan="3">Image Embedding</td>
+      <td><a href="https://towhee.io/image-embedding/timm">image_embedding.timm</a></td>
+      <td>1.3/1.3</td>
+   </tr>
+   <tr>
+      <td><a href="https://towhee.io/image-embedding/data2vec">image_embedding.data2vec</a></td>
+      <td>1.2/1.7</td>
+   </tr>
+   <tr>
+      <td><a href="https://towhee.io/image-embedding/swag">image_embedding.swag</a></td>
+      <td>1.4/N</td>
+   </tr>
+   <tr>
+      <td rowspan="1">Face Embedding</td>
+      <td><a href="https://towhee.io/face-embedding/inceptionresnetv1">face_embedding.inceptionresnetv1</a></td>
+      <td>3.2/N</td>
+   </tr>
+   <tr>
+      <td rowspan="1">Face Landmark</td>
+      <td><a href="https://towhee.io/face-landmark-detection/mobilefacenet">face_landmark_detection.mobilefacenet</a></td>
+      <td>2.1/2.1</td>
+   </tr>
+   <tr>
+      <td rowspan="4">NLP</td>
+      <td rowspan="4">Text Embedding</td>
+      <td><a href="https://towhee.io/text-embedding/transformers">text_embedding.transformers</a></td>
+      <td>2.6/N</td>
+   </tr>
+   <tr>
+      <td><a href="https://towhee.io/text-embedding/data2vec">text_embedding.data2vec</a></td>
+      <td>1.8/N</td>
+   </tr>
+   <tr>
+      <td><a href="https://towhee.io/text-embedding/realm">text_embedding.realm</a></td>
+      <td>5.5/1.9</td>
+   </tr>
+   <tr>
+      <td><a href="https://towhee.io/text-embedding/xlm_prophetnet">text_embedding.xlm_prophetnet</a></td>
+      <td>2.1/2.8</td>
+   </tr>
+   <tr>
+      <td rowspan="3">Audio</td>
+      <td rowspan="1">Audio Classification</td>
+      <td><a href="https://towhee.io/audio-classification/panns">audio_classification.panns</a></td>
+      <td>1.6/N</td>
+   </tr>
+   <tr>
+      <td rowspan="2">Audio Embedding</td>
+      <td><a href="https://towhee.io/audio-embedding/vggish">audio_embedding.vggish</a></td>
+      <td>1.5/N</td>
+   </tr>
+   <tr>
+      <td><a href="https://towhee.io/audio-embedding/data2vec">audio_embedding.data2vec</a></td>
+      <td>1.5/N</td>
+   </tr>
+   <tr>
+      <td rowspan="3">Multimodal</td>
+      <td rowspan="1">Image Text</td>
+      <td><a href="https://towhee.io/image-text-embedding/blip">image_text_embedding.blip</a></td>
+      <td>2.3/N</td>
+   </tr>
+   <tr>
+      <td rowspan="2">Video Text</td>
+      <td><a href="https://towhee.io/video-text-embedding/bridge-former">video_text_embedding.bridge_former(modality='text')</a></td>
+      <td>2.1/N</td>
+   </tr>
+   <tr>
+      <td><a href="https://towhee.io/video-text-embedding/frozen-in-time">video_text_embedding.frozen_in_time(modality='text')</a></td>
+      <td>2.2/N</td>
+   </tr>
+</table>
