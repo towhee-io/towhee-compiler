@@ -19,7 +19,7 @@ def parse_requirements(file_name: str) -> List[str]:
 
 setup(
     name="towhee.compiler",
-    version="0.1.0",
+    version="0.1.0rc1",
     url="https://github.com/towhee-io/towhee-compiler",
     description="A JIT compiler for accelerating AI programs written in python.",
     long_description=README,
