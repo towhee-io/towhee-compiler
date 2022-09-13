@@ -3,4 +3,5 @@ numpy
 recordclass
 tabulate
 torch
+torchvision
 typeguard
