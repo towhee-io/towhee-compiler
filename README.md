@@ -17,7 +17,7 @@ $ pip install towhee.compiler
 ### Install from source code
 
 ```bash
-$ git clone -b 0.1.0 https://github.com/towhee-io/towhee-compiler.git
+$ git clone -b 0.1 https://github.com/towhee-io/towhee-compiler.git
 $ cd towhee-compiler && pip install -r requirements
 $ python3 setup.py develop
 ```

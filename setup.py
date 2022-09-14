@@ -11,7 +11,7 @@ README = (HERE / 'README.md').read_text()
 
 setup(
     name="towhee.compiler",
-    version="0.1.0rc1",
+    version="0.1.1",
     url="https://github.com/towhee-io/towhee-compiler",
     description="A JIT compiler for accelerating AI programs written in python.",
     long_description=README,
