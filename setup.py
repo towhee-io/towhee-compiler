@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from typing import List
 from pathlib import Path
 
 from setuptools import Extension
@@ -9,13 +8,6 @@ from torch.utils.cpp_extension import CppExtension
 
 HERE = Path(__file__).parent
 README = (HERE / 'README.md').read_text()
-
-def parse_requirements(file_name: str) -> List[str]:
-    with open(HERE / file_name) as f:
-        return [
-            require.strip() for require in f
-            if require.strip() and not require.startswith('#')
-        ]
 
 setup(
     name="towhee.compiler",
@@ -29,7 +21,8 @@ setup(
     license="BSD-3",
     keywords="pytorch machine learning compilers",
     python_requires=">=3.7, <3.11",
-    install_requires=parse_requirements('requirements.txt'),
+    install_requires=["nebullvm<=0.4.0", "numpy", "recordclass", "tabulate",
+                      "torch>=1.12.0", "torchvision", "typeguard"],
     packages=find_packages(
         include=[
             "towhee",
